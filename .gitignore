@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.idea/
+.vscode/
+*.log
+config/project_m.json
+/opt/
