@@ -94,13 +94,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._header_title)
         layout.addStretch()
 
-        # Badge modo
-        if self._mode == "admin":
-            badge = QLabel("MODO ADMINISTRACIÓN")
-            badge.setObjectName("header_badge_admin")
-        else:
-            badge = QLabel("MODO DEMOSTRACIÓN")
-            badge.setObjectName("header_badge_demo")
+        # Indicador de modo (sutil, sin fondo verde gritón)
+        dot_color = "#3CB371" if self._mode == "admin" else "#D6A343"
+        mode_text = "Administracion" if self._mode == "admin" else "Demostracion"
+        badge = QLabel(f"<span style='color:{dot_color}; font-size:10px;'>&#9679;</span>"
+                       f"<span style='color:#989FAB; font-size:12px;'> {mode_text}</span>")
+        badge.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(badge)
 
         # Info IP
@@ -127,7 +126,7 @@ class MainWindow(QMainWindow):
         logo_lbl.setObjectName("sidebar_logo_label")
         layout.addWidget(logo_lbl)
 
-        ver_lbl = QLabel(f"v{APP_VERSION} — iptables / ipset")
+        ver_lbl = QLabel(f"v{APP_VERSION}  |  iptables / ipset")
         ver_lbl.setObjectName("sidebar_version_label")
         layout.addWidget(ver_lbl)
 
@@ -135,7 +134,7 @@ class MainWindow(QMainWindow):
 
         # Botones de navegación
         for item in NAV_ITEMS:
-            btn = QPushButton(f"  {item['icon']}  {item['label']}")
+            btn = QPushButton(f"  {item['label']}")
             btn.setObjectName("nav_btn")
             btn.setMinimumHeight(40)
             btn.clicked.connect(lambda _, page_id=item["id"]: self._navigate(page_id))

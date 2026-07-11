@@ -8,6 +8,12 @@ QMainWindow, QWidget {
     font-size: 14px;
 }
 
+/* Todos los labels transparentes por defecto — evita fondo negro en Windows */
+QLabel {
+    background-color: transparent;
+    color: #F1F3F5;
+}
+
 /* ====== SIDEBAR ====== */
 #sidebar {
     background-color: #15181E;
@@ -59,24 +65,7 @@ QPushButton#nav_btn[active="true"] {
     font-weight: 600;
     color: #F1F3F5;
 }
-#header_badge_admin {
-    background-color: #1a3a1a;
-    color: #3CB371;
-    border: 1px solid #3CB371;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: 600;
-}
-#header_badge_demo {
-    background-color: #3a2a1a;
-    color: #D6A343;
-    border: 1px solid #D6A343;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: 600;
-}
+/* badges de modo eliminados — reemplazados por indicador inline en main_window.py */
 #header_info_label {
     color: #989FAB;
     font-size: 12px;

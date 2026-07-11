@@ -73,7 +73,7 @@ BLOCKED_DOMAINS = {
             "messenger.com",
             "static.xx.fbcdn.net",
         ],
-        "enabled": True,
+        "enabled": False,
     },
     "youtube": {
         "label": "YouTube",
@@ -87,7 +87,7 @@ BLOCKED_DOMAINS = {
             "yt3.ggpht.com",
             "youtube-nocookie.com",
         ],
-        "enabled": True,
+        "enabled": False,
     },
     "hotmail": {
         "label": "Hotmail / Outlook",
@@ -100,15 +100,15 @@ BLOCKED_DOMAINS = {
             "outlook.com",
             "office365.com",
         ],
-        "enabled": True,
+        "enabled": False,
     },
 }
 
 # Perfiles connlimit por defecto
 DEFAULT_CONN_PROFILES = [
-    {"name": "SSH",         "proto": "tcp", "port": 22,  "max": 3,  "action": "REJECT", "enabled": True},
-    {"name": "HTTP",        "proto": "tcp", "port": 80,  "max": 10, "action": "REJECT", "enabled": True},
-    {"name": "HTTPS",       "proto": "tcp", "port": 443, "max": 10, "action": "REJECT", "enabled": True},
+    {"name": "SSH",         "proto": "tcp", "port": 22,  "max": 3,  "action": "REJECT", "enabled": False},
+    {"name": "HTTP",        "proto": "tcp", "port": 80,  "max": 10, "action": "REJECT", "enabled": False},
+    {"name": "HTTPS",       "proto": "tcp", "port": 443, "max": 10, "action": "REJECT", "enabled": False},
     {"name": "Personalizado","proto": "tcp", "port": 0,   "max": 5,  "action": "REJECT", "enabled": False},
 ]
 
@@ -118,12 +118,12 @@ WEB_BLOCK_UDP_PORTS = [443]   # UDP/QUIC
 
 # Navegación lateral
 NAV_ITEMS = [
-    {"id": "dashboard",    "label": "Inicio",            "icon": "🏠"},
-    {"id": "websites",     "label": "Sitios Web",        "icon": "🌐"},
-    {"id": "clisrv",       "label": "Cliente / Servidor","icon": "🔁"},
-    {"id": "mac",          "label": "Bloqueo MAC",       "icon": "📛"},
-    {"id": "connections",  "label": "Conexiones",        "icon": "🔗"},
-    {"id": "logs",         "label": "Registros",         "icon": "📋"},
-    {"id": "backups",      "label": "Copias",            "icon": "💾"},
-    {"id": "settings",     "label": "Configuración",     "icon": "⚙️"},
+    {"id": "dashboard",    "label": "Inicio"},
+    {"id": "websites",     "label": "Sitios Web"},
+    {"id": "clisrv",       "label": "Cliente / Servidor"},
+    {"id": "mac",          "label": "Bloqueo MAC"},
+    {"id": "connections",  "label": "Conexiones"},
+    {"id": "logs",         "label": "Registros"},
+    {"id": "backups",      "label": "Copias de seguridad"},
+    {"id": "settings",     "label": "Configuracion"},
 ]
