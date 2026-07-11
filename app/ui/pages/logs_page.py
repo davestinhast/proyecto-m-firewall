@@ -86,7 +86,7 @@ class LogsPage(QWidget):
         filter_layout.addWidget(btn_clear)
 
         btn_export = QPushButton("Exportar CSV")
-        btn_export.setObjectName("btn_primary")
+        btn_export.setObjectName("btn_secondary")
         btn_export.clicked.connect(self._export_csv)
         filter_layout.addWidget(btn_export)
 

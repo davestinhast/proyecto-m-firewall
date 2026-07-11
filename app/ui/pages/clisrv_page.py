@@ -67,9 +67,9 @@ class CliSrvPage(QWidget):
             lbl = QLabel(text)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(
-                f"background-color: #1B1F27; color: {color}; "
-                "border: 1px solid #2A303B; border-radius: 6px; "
-                "padding: 12px 20px; font-weight: 600; font-size: 14px;"
+                f"background-color: #0f0f0f; color: {color}; "
+                "border: 1px solid #1c1c1c; border-radius: 4px; "
+                "padding: 12px 20px; font-weight: 600; font-size: 13px;"
             )
             return lbl
 

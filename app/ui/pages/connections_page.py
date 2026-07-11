@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QFormLayout,
 )
 from PySide6.QtCore import Qt, Signal
-from app.ui.widgets.toggle_switch import ToggleSwitch
 from app.constants import DEFAULT_CONN_PROFILES
 import copy
 
@@ -182,14 +181,20 @@ class ConnectionsPage(QWidget):
             self._table.setItem(row, 3, QTableWidgetItem(str(p.get("max", "")) + " conexiones"))
             self._table.setItem(row, 4, QTableWidgetItem(p.get("action", "REJECT")))
 
-            toggle = ToggleSwitch()
-            toggle.setChecked(p.get("enabled", True))
-            toggle.toggled.connect(lambda checked, r=row: self._toggle_profile(r, checked))
-            cell_widget = QWidget()
-            cell_layout = QHBoxLayout(cell_widget)
-            cell_layout.setContentsMargins(8, 4, 8, 4)
-            cell_layout.addWidget(toggle)
-            self._table.setCellWidget(row, 5, cell_widget)
+            from PySide6.QtWidgets import QCheckBox as _QCB
+            chk = _QCB("Activo" if p.get("enabled", False) else "Inactivo")
+            chk.setChecked(p.get("enabled", False))
+            chk.setStyleSheet(
+                "QCheckBox { color: #555555; font-size: 11px; padding: 0 8px; background: transparent; }"
+                "QCheckBox:checked { color: #22c55e; }"
+                "QCheckBox::indicator { width:14px; height:14px; border-radius:3px; border:1px solid #2a2a2a; background:#0a0a0a; }"
+                "QCheckBox::indicator:checked { background:#3b82f6; border-color:#3b82f6; }"
+            )
+            chk.toggled.connect(lambda checked, r=row, c=chk: (
+                c.setText("Activo" if checked else "Inactivo"),
+                self._toggle_profile(r, checked)
+            ))
+            self._table.setCellWidget(row, 5, chk)
 
     def _add_profile(self):
         dialog = AddProfileDialog(parent=self)
