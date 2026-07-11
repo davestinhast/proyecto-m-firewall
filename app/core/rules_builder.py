@@ -61,9 +61,10 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             if not mac:
                 continue
             iface_flag = f"-i {iface} " if iface else ""
+            lines.append(f"# MAC: {name}")
             lines.append(
                 f"-A {CHAIN_MACBLOCK} {iface_flag}-m mac --mac-source {mac} "
-                f"-j {IPTABLES_CHAIN_REJECT}  # {name}"
+                f"-j {IPTABLES_CHAIN_REJECT}"
             )
         lines.append("")
 
@@ -83,10 +84,11 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
                 continue
             reject_flag = "--reject-with tcp-reset" if action == "REJECT" and proto == "tcp" else ""
             target = f"REJECT {reject_flag}".strip() if action == "REJECT" else "DROP"
+            lines.append(f"# connlimit: {name}")
             lines.append(
                 f"-A {CHAIN_CONNLIMIT} -p {proto} --dport {port} "
                 f"-m connlimit --connlimit-above {max_conn} --connlimit-mask 32 "
-                f"-j {target}  # {name}"
+                f"-j {target}"
             )
         lines.append("")
 
@@ -110,7 +112,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
                 proto_flag = f"-p {proto} " if proto != "all" else ""
                 lines.append(
                     f"-A {CHAIN_CLISRV} {iface_flag}{proto_flag}-s {cli} -d {srv} "
-                    f"-m state --state NEW -j {IPTABLES_CHAIN_REJECT}  # bloqueo NEW"
+                    f"-m state --state NEW -j {IPTABLES_CHAIN_REJECT}"
                 )
             lines.append("")
 
