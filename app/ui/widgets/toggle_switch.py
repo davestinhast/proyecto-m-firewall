@@ -40,7 +40,7 @@ class ToggleSwitch(QAbstractButton):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        track_color = QColor("#4F7DF3") if self.isChecked() else QColor("#2A303B")
+        track_color = QColor("#3B82F6") if self.isChecked() else QColor("#29313D")
         p.setBrush(track_color)
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(0, 0, self.width(), self.height(), 12, 12)

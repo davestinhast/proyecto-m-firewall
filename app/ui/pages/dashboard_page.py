@@ -239,9 +239,9 @@ class DashboardPage(QWidget):
         title_lbl = QLabel(step["title"])
         title_lbl.setObjectName("label_subtitle" if not done else "label_subtitle")
         if done:
-            title_lbl.setStyleSheet("color: #22c55e; font-weight: 600; font-size: 13px; background: transparent;")
+            title_lbl.setStyleSheet("color: #22C55E; font-weight: 600; font-size: 13px; background: transparent;")
         else:
-            title_lbl.setStyleSheet("color: #e5e5e5; font-weight: 600; font-size: 13px; background: transparent;")
+            title_lbl.setStyleSheet("color: #F1F5F9; font-weight: 600; font-size: 13px; background: transparent;")
 
         desc_lbl = QLabel(step["desc"])
         desc_lbl.setObjectName("label_secondary")
@@ -348,7 +348,7 @@ class DashboardPage(QWidget):
         for col_name, stretch in [("Hora", 2), ("Origen", 3), ("Destino", 3), ("Proto", 1), ("Motivo", 3)]:
             h = QLabel(col_name.upper())
             h.setObjectName("label_hint")
-            h.setStyleSheet("color: #2a2a2a; font-size: 10px; font-weight: 700; letter-spacing: 1px; background: transparent;")
+            h.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 1px; background: transparent;")
             header_layout.addWidget(h, stretch=stretch)
         layout.addWidget(header_row)
 
@@ -426,7 +426,7 @@ class DashboardPage(QWidget):
             row_layout.setContentsMargins(8, 5, 8, 5)
             row_layout.setSpacing(0)
 
-            def cell(text, stretch, color="#555555"):
+            def cell(text, stretch, color="#94A3B8"):
                 lbl = QLabel(text)
                 lbl.setStyleSheet(f"color: {color}; font-size: 11px; font-family: 'Consolas','Courier New',monospace; background: transparent;")
                 row_layout.addWidget(lbl, stretch=stretch)
