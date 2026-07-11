@@ -1,0 +1,10 @@
+# M-FIREWALL — Archivo de reglas inicial (vacío)
+# Generado al aplicar reglas desde la interfaz gráfica.
+# NO utilizar /etc/sysconfig/iptables
+# Cargar con: iptables-restore < /opt/proyecto-m/rules/project_m.rules.v4
+
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+COMMIT

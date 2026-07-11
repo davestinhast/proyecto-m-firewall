@@ -1,0 +1,65 @@
+{
+  "interfaces": {
+    "wan": "eth0",
+    "lan": "eth1"
+  },
+  "server_ip": "192.168.50.1",
+  "client_network": "192.168.50.0/24",
+  "rules_file": "/opt/proyecto-m/rules/project_m.rules.v4",
+  "log_dir": "/var/log/proyecto-m",
+  "log_file": "/var/log/proyecto-m/iptables-rejected.log",
+  "domain_refresh_interval": 3600,
+  "auto_load_on_boot": false,
+  "default_action": "DROP",
+  "blocked_domains": {
+    "facebook": {
+      "label": "Facebook",
+      "description": "Facebook, Messenger y CDN asociado",
+      "domains": [
+        "facebook.com",
+        "www.facebook.com",
+        "m.facebook.com",
+        "fbcdn.net",
+        "messenger.com"
+      ],
+      "enabled": true
+    },
+    "youtube": {
+      "label": "YouTube",
+      "description": "YouTube y Google Video CDN",
+      "domains": [
+        "youtube.com",
+        "www.youtube.com",
+        "youtu.be",
+        "googlevideo.com",
+        "ytimg.com"
+      ],
+      "enabled": true
+    },
+    "hotmail": {
+      "label": "Hotmail / Outlook",
+      "description": "Microsoft Hotmail, Outlook y Live",
+      "domains": [
+        "hotmail.com",
+        "outlook.live.com",
+        "login.live.com",
+        "live.com"
+      ],
+      "enabled": true
+    }
+  },
+  "mac_rules": [],
+  "conn_profiles": [
+    {"name": "SSH",   "proto": "tcp", "port": 22,  "max": 3,  "action": "REJECT", "enabled": true},
+    {"name": "HTTP",  "proto": "tcp", "port": 80,  "max": 10, "action": "REJECT", "enabled": true},
+    {"name": "HTTPS", "proto": "tcp", "port": 443, "max": 10, "action": "REJECT", "enabled": true}
+  ],
+  "clisrv": {
+    "enabled": false,
+    "server_ip": "192.168.50.1",
+    "client_ip": "192.168.50.10",
+    "interface": "eth1",
+    "protocols": ["tcp", "udp", "icmp"],
+    "action": "DROP"
+  }
+}
