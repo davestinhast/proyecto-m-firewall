@@ -118,39 +118,43 @@ class MainWindow(QMainWindow):
         frame.setFixedWidth(SIDEBAR_WIDTH)
 
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(12, 20, 12, 20)
-        layout.setSpacing(2)
+        layout.setContentsMargins(0, 24, 0, 20)
+        layout.setSpacing(1)
 
         # Logo
         logo_lbl = QLabel(APP_NAME)
         logo_lbl.setObjectName("sidebar_logo_label")
+        logo_lbl.setContentsMargins(16, 0, 16, 0)
         layout.addWidget(logo_lbl)
 
         ver_lbl = QLabel(f"v{APP_VERSION}  |  iptables / ipset")
         ver_lbl.setObjectName("sidebar_version_label")
+        ver_lbl.setContentsMargins(16, 0, 16, 0)
         layout.addWidget(ver_lbl)
 
-        layout.addSpacing(16)
+        layout.addSpacing(20)
 
         # Botones de navegación
         for item in NAV_ITEMS:
             btn = QPushButton(f"  {item['label']}")
             btn.setObjectName("nav_btn")
-            btn.setMinimumHeight(40)
+            btn.setMinimumHeight(38)
             btn.clicked.connect(lambda _, page_id=item["id"]: self._navigate(page_id))
             layout.addWidget(btn)
             self._nav_buttons[item["id"]] = btn
 
         layout.addStretch()
 
-        # Autores
+        # Autores al fondo — minimalista
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         layout.addWidget(sep)
+        layout.addSpacing(8)
 
         for author in ["Quezada F.", "Espinola M.", "Sanchez L."]:
             lbl = QLabel(author)
-            lbl.setObjectName("sidebar_version_label")
+            lbl.setObjectName("sidebar_author_label")
+            lbl.setContentsMargins(16, 0, 16, 0)
             layout.addWidget(lbl)
 
         return frame
@@ -202,10 +206,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._status_label)
         layout.addStretch()
 
-        btn_validate = QPushButton("Validar sin aplicar")
+        btn_validate = QPushButton("Validar")
         btn_validate.setObjectName("btn_secondary")
+        btn_validate.setToolTip("Verifica las reglas sin aplicarlas")
         btn_validate.clicked.connect(self._validate_rules)
         layout.addWidget(btn_validate)
+
+        btn_flush = QPushButton("Restaurar copia")
+        btn_flush.setObjectName("btn_secondary")
+        btn_flush.setToolTip("Restaura la ultima copia de seguridad")
+        btn_flush.clicked.connect(self._restore_last)
+        layout.addWidget(btn_flush)
 
         self._btn_apply = QPushButton("Aplicar reglas")
         self._btn_apply.setObjectName("btn_primary")
@@ -214,11 +225,6 @@ class MainWindow(QMainWindow):
             self._btn_apply.setEnabled(False)
             self._btn_apply.setToolTip("Disponible solo en Kali Linux con iptables.")
         layout.addWidget(self._btn_apply)
-
-        btn_flush = QPushButton("Restaurar anterior")
-        btn_flush.setObjectName("btn_danger")
-        btn_flush.clicked.connect(self._restore_last)
-        layout.addWidget(btn_flush)
 
         return frame
 
