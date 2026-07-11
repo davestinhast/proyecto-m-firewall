@@ -39,11 +39,19 @@ _DEFAULT_CONFIG = {
 def _get_config_path() -> Path:
     if is_linux():
         linux_path = Path("/opt/proyecto-m/config/project_m.json")
+        # Intentar crear el directorio si no existe y somos root
+        if not linux_path.parent.exists():
+            try:
+                linux_path.parent.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                pass  # No somos root, usar fallback local
         if linux_path.parent.exists():
             return linux_path
-    # fallback: junto al repo
+    # Fallback: directorio local junto al repo (funciona en Windows y Linux sin root)
     base = Path(__file__).resolve().parent.parent.parent
-    return base / "config" / "project_m.json"
+    local_path = base / "config" / "project_m.json"
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    return local_path
 
 
 def load_config() -> dict:

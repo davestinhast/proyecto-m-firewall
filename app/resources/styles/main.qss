@@ -25,8 +25,16 @@
     outline: none;
 }
 
-QMainWindow, QWidget, QDialog {
+/* Solo QMainWindow pinta el fondo de la ventana principal.
+   QWidget es transparent por defecto para que los containers
+   dentro de cards muestren el color de la card, no el fondo
+   de la ventana. QDialog tiene su propio fondo más abajo. */
+QMainWindow {
     background-color: #080B10;
+}
+
+QWidget {
+    background-color: transparent;
     color: #F1F5F9;
     font-family: "Segoe UI", "Ubuntu", "Noto Sans", sans-serif;
     font-size: 13px;
@@ -473,7 +481,15 @@ QScrollArea {
     border: none;
     background-color: transparent;
 }
+QScrollArea > QWidget {
+    background-color: transparent;
+}
 QScrollArea > QWidget > QWidget {
+    background-color: transparent;
+}
+
+/* El stacked widget y sus hijos directos también transparentes */
+QStackedWidget {
     background-color: transparent;
 }
 
@@ -502,11 +518,18 @@ QToolTip {
 }
 
 /* ====== DIALOG ====== */
+/* Dialogs son ventanas top-level — necesitan fondo explícito */
 QDialog {
     background-color: #11161D;
 }
+QDialog QWidget {
+    background-color: transparent;
+}
 QMessageBox {
     background-color: #11161D;
+}
+QMessageBox QWidget {
+    background-color: transparent;
 }
 QMessageBox QLabel {
     color: #F1F5F9;
