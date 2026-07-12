@@ -39,6 +39,10 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# Asegurar que el directorio del proyecto esté en PYTHONPATH
+# (sys.path.insert en run.py no siempre funciona bajo sudo)
+export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+
 # Lanzar (python3 primero, python como fallback)
 if command -v python3 &>/dev/null; then
     python3 run.py
