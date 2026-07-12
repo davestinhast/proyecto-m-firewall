@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         self._current_page_id = "dashboard"
         self._scroll_positions: dict[str, int] = {}
         self._nav_buttons: dict[str, QPushButton] = {}
+        self._pending_changes = False
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -179,9 +180,11 @@ class MainWindow(QMainWindow):
             page = cls(cfg)
             if hasattr(page, "config_changed"):
                 page.config_changed.connect(self._on_config_changed)
-            # Botón Aplicar del dashboard conectado al método de la ventana
-            if page_id == "dashboard" and hasattr(page, "navigate_requested"):
-                page.navigate_requested.connect(self._navigate)
+            if page_id == "dashboard":
+                if hasattr(page, "navigate_requested"):
+                    page.navigate_requested.connect(self._navigate)
+                if hasattr(page, "apply_requested"):
+                    page.apply_requested.connect(self._apply_rules)
             self._pages[page_id] = page
             self._stack.addWidget(page)
 
@@ -252,11 +255,12 @@ class MainWindow(QMainWindow):
     def _on_config_changed(self, new_config: dict):
         self._config = new_config
         save_config(new_config)
-        # Propagar a todas las páginas
         for page in self._pages.values():
             if hasattr(page, "update_config"):
                 page.update_config(new_config)
         self._status_label.setText("Configuración guardada.")
+        self._pending_changes = True
+        self._update_apply_btn_style()
 
     # ── APLICAR REGLAS ───────────────────────────────────────────────────────
     def _apply_rules(self):
@@ -290,9 +294,25 @@ class MainWindow(QMainWindow):
         self._btn_apply.setEnabled(self._mode == "admin")
         self._status_label.setText(msg)
         if ok:
+            self._pending_changes = False
+            self._update_apply_btn_style()
+            dashboard = self._pages.get("dashboard")
+            if dashboard and hasattr(dashboard, "mark_applied"):
+                dashboard.mark_applied()
             QMessageBox.information(self, "Reglas aplicadas", msg)
         else:
             QMessageBox.warning(self, "Error al aplicar", msg)
+
+    def _update_apply_btn_style(self):
+        """Cambia color del botón Aplicar según estado de cambios pendientes."""
+        if self._pending_changes:
+            self._btn_apply.setObjectName("btn_warning")
+            self._btn_apply.setText("● Aplicar cambios")
+        else:
+            self._btn_apply.setObjectName("btn_primary")
+            self._btn_apply.setText("Aplicar reglas")
+        self._btn_apply.style().unpolish(self._btn_apply)
+        self._btn_apply.style().polish(self._btn_apply)
 
     def _validate_rules(self):
         if self._validate_worker and self._validate_worker.isRunning():

@@ -332,6 +332,26 @@ QPushButton#btn_small:hover {
     color: #E2EAFA;
     border-color: #3B82F6;
 }
+QPushButton#btn_warning {
+    background-color: #f59e0b;
+    color: #111827;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 13px;
+}
+QPushButton#btn_warning:hover {
+    background-color: #d97706;
+}
+QPushButton#btn_warning:pressed {
+    background-color: #b45309;
+}
+QPushButton#btn_warning:disabled {
+    background-color: #1B2A47;
+    color: #5C7A95;
+}
+
 QPushButton#btn_link {
     background-color: transparent;
     color: #3B82F6;

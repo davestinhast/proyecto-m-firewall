@@ -111,39 +111,45 @@ class SettingsPage(QWidget):
         return frame
 
     def _build_routing_diag_card(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card")
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(12)
+        outer = QFrame()
+        outer.setObjectName("card")
+        outer_layout = QVBoxLayout(outer)
+        outer_layout.setContentsMargins(20, 14, 20, 14)
+        outer_layout.setSpacing(0)
 
-        title_row = QHBoxLayout()
-        subtitle = QLabel("Diagnóstico de enrutamiento")
-        subtitle.setObjectName("label_subtitle")
-        title_row.addWidget(subtitle)
-        title_row.addStretch()
-        btn_diag = QPushButton("Ejecutar diagnóstico")
-        btn_diag.setObjectName("btn_secondary")
-        btn_diag.clicked.connect(self._run_diag)
-        title_row.addWidget(btn_diag)
-        layout.addLayout(title_row)
+        # Toggle header — collapsed by default
+        self._diag_toggle_btn = QPushButton("▶  Diagnóstico de enrutamiento  (configuración avanzada)")
+        self._diag_toggle_btn.setObjectName("btn_link")
+        self._diag_toggle_btn.clicked.connect(self._toggle_diag)
+        outer_layout.addWidget(self._diag_toggle_btn)
 
+        # Collapsible content
+        self._diag_content = QWidget()
+        content_layout = QVBoxLayout(self._diag_content)
+        content_layout.setContentsMargins(0, 14, 0, 4)
+        content_layout.setSpacing(12)
+
+        desc_row = QHBoxLayout()
         desc = QLabel(
             "Para que el bloqueo funcione en los clientes, éstos deben tener la IP de Kali "
             "como gateway (puerta de enlace). Si no, su tráfico nunca pasa por Kali."
         )
         desc.setObjectName("label_secondary")
         desc.setWordWrap(True)
-        layout.addWidget(desc)
+        desc_row.addWidget(desc, stretch=1)
+        btn_diag = QPushButton("Ejecutar diagnóstico")
+        btn_diag.setObjectName("btn_secondary")
+        btn_diag.clicked.connect(self._run_diag)
+        desc_row.addWidget(btn_diag)
+        content_layout.addLayout(desc_row)
 
-        # Resultados del diagnóstico
-        self._diag_labels: dict[str, QLabel] = {}
+        self._diag_labels: dict = {}
         checks = [
-            ("ip_forward",   "IP Forward (net.ipv4.ip_forward)"),
-            ("masquerade",   "NAT MASQUERADE en iptables"),
-            ("wan_set",      "Interfaz WAN configurada"),
-            ("lan_set",      "Interfaz LAN configurada"),
-            ("server_ip",    "IP del servidor configurada"),
+            ("ip_forward", "IP Forward (net.ipv4.ip_forward)"),
+            ("masquerade", "NAT MASQUERADE en iptables"),
+            ("wan_set",    "Interfaz WAN configurada"),
+            ("lan_set",    "Interfaz LAN configurada"),
+            ("server_ip",  "IP del servidor configurada"),
         ]
         for key, text in checks:
             row = QHBoxLayout()
@@ -155,31 +161,41 @@ class SettingsPage(QWidget):
             row.addWidget(lbl_key)
             row.addWidget(lbl_val)
             row.addStretch()
-            layout.addLayout(row)
+            content_layout.addLayout(row)
             self._diag_labels[key] = lbl_val
 
-        # Instrucciones para el cliente
         instruct_frame = QFrame()
         instruct_frame.setObjectName("card_step_pending")
         instruct_layout = QVBoxLayout(instruct_frame)
         instruct_layout.setContentsMargins(16, 12, 16, 12)
         instruct_layout.setSpacing(6)
-
         inst_title = QLabel("Cómo configurar el gateway en los clientes")
         inst_title.setObjectName("label_subtitle")
         instruct_layout.addWidget(inst_title)
-
-        self._instruct_label = QLabel(
-            "Ejecuta el diagnóstico para ver las instrucciones específicas."
-        )
+        self._instruct_label = QLabel("Ejecuta el diagnóstico para ver las instrucciones.")
         self._instruct_label.setObjectName("label_secondary")
         self._instruct_label.setWordWrap(True)
         instruct_layout.addWidget(self._instruct_label)
+        content_layout.addWidget(instruct_frame)
 
-        layout.addWidget(instruct_frame)
-        return frame
+        self._diag_content.setVisible(False)
+        outer_layout.addWidget(self._diag_content)
+        return outer
+
+    def _toggle_diag(self):
+        visible = self._diag_content.isVisible()
+        self._diag_content.setVisible(not visible)
+        arrow = "▼" if not visible else "▶"
+        self._diag_toggle_btn.setText(
+            f"{arrow}  Diagnóstico de enrutamiento  (configuración avanzada)"
+        )
 
     def _run_diag(self):
+        # Auto-expand if collapsed
+        if not self._diag_content.isVisible():
+            self._diag_content.setVisible(True)
+            self._diag_toggle_btn.setText("▼  Diagnóstico de enrutamiento  (configuración avanzada)")
+
         from app.core.platform_detector import is_linux, has_ip_forward
 
         # ip_forward
