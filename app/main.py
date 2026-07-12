@@ -4,8 +4,8 @@ M-FIREWALL — Entry point de la aplicación
 
 import sys
 import copy
-from app.core.configuration import load_config, save_config
-from app.constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
+from .core.configuration import load_config, save_config
+from .constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
 
 # Versión del esquema de config — incrementar cuando cambien los defaults
 CONFIG_SCHEMA_VERSION = 2
