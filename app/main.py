@@ -4,7 +4,6 @@ M-FIREWALL — Entry point de la aplicación
 
 import sys
 import copy
-from PySide6.QtWidgets import QApplication
 from app.core.configuration import load_config, save_config
 from app.constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
 
@@ -78,6 +77,7 @@ def _auto_detect_network(config: dict) -> dict:
 
 
 def main():
+    from PySide6.QtWidgets import QApplication
     app = QApplication(sys.argv)
     app.setApplicationName("M-FIREWALL")
     app.setOrganizationName("ProyectoM")
