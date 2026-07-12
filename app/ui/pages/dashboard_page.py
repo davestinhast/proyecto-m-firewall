@@ -8,13 +8,14 @@ from PySide6.QtWidgets import (
     QScrollArea, QPushButton, QGridLayout,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QCursor
 from app.core.platform_detector import get_system_info, get_mode
 from app.services import logging_service, network_service
 from app.constants import APP_AUTHORS, APP_VERSION
 
 
 class DashboardPage(QWidget):
-    apply_requested = Signal()   # emitido cuando el usuario pulsa Aplicar desde el dashboard
+    navigate_requested = Signal(str)   # emitido cuando el usuario pulsa "Ir →" en un paso
 
     def __init__(self, config: dict, parent=None):
         super().__init__(parent)
@@ -53,13 +54,10 @@ class DashboardPage(QWidget):
         self._layout.addSpacing(4)
 
         # Checklist de configuración
-        self._layout.addWidget(self._build_checklist_header())
+        self._checklist_header_widget = self._build_checklist_header()
+        self._layout.addWidget(self._checklist_header_widget)
         self._checklist_frame = self._build_checklist()
         self._layout.addWidget(self._checklist_frame)
-        self._layout.addSpacing(8)
-
-        # Botón Aplicar reglas prominente
-        self._layout.addWidget(self._build_apply_row())
         self._layout.addSpacing(4)
 
         # Estadísticas rápidas
@@ -139,13 +137,24 @@ class DashboardPage(QWidget):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 4)
-        l.setSpacing(2)
+        l.setSpacing(4)
+
+        row = QHBoxLayout()
         lbl = QLabel("Pasos de configuracion")
         lbl.setObjectName("label_subtitle")
-        hint = QLabel("Completa cada paso en orden. Cuando todos esten listos, usa 'Aplicar reglas' en la parte inferior.")
+        row.addWidget(lbl)
+        row.addStretch()
+        self._progress_lbl = QLabel("0 / 6 completados")
+        self._progress_lbl.setStyleSheet(
+            "color: #8AAABB; font-size: 12px; font-weight: 600; background: transparent;"
+        )
+        row.addWidget(self._progress_lbl)
+        l.addLayout(row)
+
+        hint = QLabel("Haz clic en cualquier paso para ir directo a esa pantalla. "
+                      "Cuando esten todos en verde, pulsa 'Aplicar reglas' abajo a la derecha.")
         hint.setObjectName("label_secondary")
         hint.setWordWrap(True)
-        l.addWidget(lbl)
         l.addWidget(hint)
         return w
 
@@ -249,7 +258,6 @@ class DashboardPage(QWidget):
         content_layout.setSpacing(2)
 
         title_lbl = QLabel(step["title"])
-        title_lbl.setObjectName("label_subtitle" if not done else "label_subtitle")
         if done:
             title_lbl.setStyleSheet("color: #22C55E; font-weight: 600; font-size: 13px; background: transparent;")
         else:
@@ -263,69 +271,66 @@ class DashboardPage(QWidget):
         content_layout.addWidget(desc_lbl)
         layout.addWidget(content, stretch=1)
 
-        # Estado + boton ir
+        # Derecha: badge + botón Ir (si tiene página destino)
         right = QWidget()
         right.setObjectName("card_inner")
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(4)
+        right_layout.setSpacing(6)
         right_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
 
         if done:
-            status_lbl = QLabel("Listo")
+            status_lbl = QLabel("✓ Listo")
             status_lbl.setObjectName("label_tag_active")
-            right_layout.addWidget(status_lbl)
         else:
             status_lbl = QLabel("Pendiente")
             status_lbl.setObjectName("label_tag_inactive")
-            right_layout.addWidget(status_lbl)
+        right_layout.addWidget(status_lbl)
+
+        page_id = step.get("page")
+        if page_id:
+            btn_go = QPushButton("Ir →")
+            btn_go.setObjectName("btn_secondary")
+            btn_go.setFixedWidth(60)
+            btn_go.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            btn_go.clicked.connect(lambda _, pid=page_id: self.navigate_requested.emit(pid))
+            right_layout.addWidget(btn_go)
 
         layout.addWidget(right)
         return frame
 
     def _rebuild_checklist(self):
         """Destruye y reconstruye las tarjetas de paso con estado actualizado."""
-        # limpiar
         while self._checklist_frame.layout().count():
             item = self._checklist_frame.layout().takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         self._step_frames.clear()
 
+        done_count = 0
+        # Solo los pasos 1-6 cuentan (el 7 es manual, nunca verde)
+        countable = [s for s in self._step_data if s.get("page") is not None]
         for step in self._step_data:
             done = step["check"](self._config)
+            if done and step.get("page") is not None:
+                done_count += 1
             frame = self._build_step_card(step, done=done)
             self._checklist_frame.layout().addWidget(frame)
             self._step_frames.append(frame)
 
-    # ─── APPLY ROW ───────────────────────────────────────────────────────────
-    def _build_apply_row(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card")
-        layout = QHBoxLayout(frame)
-        layout.setContentsMargins(20, 14, 20, 14)
-        layout.setSpacing(16)
+        total = len(countable)
+        if done_count == total:
+            color = "#22c55e"
+            text = f"✓ {done_count} / {total} completados — listo para aplicar"
+        else:
+            color = "#8AAABB"
+            text = f"{done_count} / {total} completados"
 
-        info_col = QVBoxLayout()
-        lbl_title = QLabel("Cuando todos los pasos esten listos")
-        lbl_title.setObjectName("label_subtitle")
-        lbl_desc = QLabel(
-            "Se validaran las reglas, se creara una copia de seguridad automatica "
-            "y se cargaran en iptables inmediatamente."
-        )
-        lbl_desc.setObjectName("label_secondary")
-        lbl_desc.setWordWrap(True)
-        info_col.addWidget(lbl_title)
-        info_col.addWidget(lbl_desc)
-        layout.addLayout(info_col, stretch=1)
-
-        btn = QPushButton("Aplicar reglas")
-        btn.setObjectName("btn_primary")
-        btn.setMinimumWidth(160)
-        btn.setMinimumHeight(38)
-        btn.clicked.connect(self.apply_requested.emit)
-        layout.addWidget(btn)
-        return frame
+        if hasattr(self, "_progress_lbl"):
+            self._progress_lbl.setStyleSheet(
+                f"color: {color}; font-size: 12px; font-weight: 600; background: transparent;"
+            )
+            self._progress_lbl.setText(text)
 
     # ─── STATS ───────────────────────────────────────────────────────────────
     def _build_stats_row(self) -> QWidget:

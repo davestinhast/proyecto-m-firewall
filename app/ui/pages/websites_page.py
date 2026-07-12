@@ -5,16 +5,18 @@ Pantalla 2 — Bloqueo de sitios web
 import socket
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QPushButton, QSizePolicy,
+    QScrollArea, QPushButton,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from app.ui.widgets.toggle_switch import ToggleSwitch
-from app.services import domain_service
 from app.constants import BLOCKED_DOMAINS
 
 
-class _ResolveWorker(QThread):
-    finished = Signal(str, list)  # key, ips
+class _FullCheckWorker(QThread):
+    """
+    Resolución de IPs + conteo de reglas iptables + test TCP en un solo paso.
+    """
+    finished = Signal(str, int, int, bool)  # key, ip_count, rule_count, reachable
 
     def __init__(self, key: str, domains: list[str]):
         super().__init__()
@@ -22,30 +24,17 @@ class _ResolveWorker(QThread):
         self._domains = domains
 
     def run(self):
+        # 1. Resolver IPs
+        from app.services import domain_service
+        import subprocess
         ips: set[str] = set()
-        for domain in self._domains:
-            ips.update(domain_service.resolve_domain(domain))
-        self.finished.emit(self._key, sorted(ips))
+        for d in self._domains:
+            ips.update(domain_service.resolve_domain(d))
+        ip_count = len(ips)
 
-
-class _CheckWorker(QThread):
-    """
-    Verifica en paralelo:
-    1. Cuántas reglas hay en iptables PM_WEBBLOCK para este sitio
-    2. Si el sitio es alcanzable vía TCP 443 (desde Kali)
-    """
-    finished = Signal(str, int, bool)  # key, rule_count, reachable
-
-    def __init__(self, key: str, domains: list[str]):
-        super().__init__()
-        self._key = key
-        self._domains = domains
-
-    def run(self):
-        # --- Contar reglas en iptables ---
+        # 2. Contar reglas en iptables PM_WEBBLOCK
         rule_count = 0
         try:
-            import subprocess
             result = subprocess.run(
                 ["iptables", "-L", "PM_WEBBLOCK", "-n"],
                 capture_output=True, text=True, timeout=5
@@ -53,12 +42,12 @@ class _CheckWorker(QThread):
             if result.returncode == 0:
                 rule_count = sum(
                     1 for line in result.stdout.splitlines()
-                    if line.strip().startswith("-j") or "PM_REJECT" in line or "DROP" in line
+                    if "PM_REJECT" in line or "DROP" in line
                 )
         except Exception:
-            rule_count = -1  # -1 = no se pudo verificar (Windows / sin permisos)
+            rule_count = -1
 
-        # --- Reachability: TCP connect al primer dominio ---
+        # 3. Test TCP 443
         reachable = False
         try:
             domain = self._domains[0] if self._domains else ""
@@ -71,13 +60,12 @@ class _CheckWorker(QThread):
         except Exception:
             reachable = False
 
-        self.finished.emit(self._key, rule_count, reachable)
+        self.finished.emit(self._key, ip_count, rule_count, reachable)
 
 
 class SiteCard(QFrame):
     toggled = Signal(str, bool)
-    update_requested = Signal(str)
-    check_requested = Signal(str)
+    check_requested = Signal(str)   # único botón: actualizar IPs + verificar estado
 
     def __init__(self, key: str, cfg: dict, parent=None):
         super().__init__(parent)
@@ -132,18 +120,13 @@ class SiteCard(QFrame):
         self._reach_label.setObjectName("label_secondary")
         layout.addWidget(self._reach_label)
 
-        # Botones
+        # Botón único: actualizar IPs + verificar estado en un paso
         btn_row = QHBoxLayout()
-        btn_update = QPushButton("Actualizar IPs")
-        btn_update.setObjectName("btn_secondary")
-        btn_update.clicked.connect(lambda: self.update_requested.emit(self._key))
-        btn_row.addWidget(btn_update)
-
-        self._btn_check = QPushButton("Verificar estado")
+        self._btn_check = QPushButton("Actualizar y verificar")
         self._btn_check.setObjectName("btn_secondary")
+        self._btn_check.setToolTip("Resuelve las IPs del dominio y comprueba si las reglas están cargadas en iptables")
         self._btn_check.clicked.connect(lambda: self.check_requested.emit(self._key))
         btn_row.addWidget(self._btn_check)
-
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -160,10 +143,13 @@ class SiteCard(QFrame):
     def set_checking(self, checking: bool):
         self._btn_check.setEnabled(not checking)
         if checking:
-            self._rules_label.setText("Verificando...")
+            self._ip_label.setText("Actualizando IPs...")
+            self._rules_label.setText("Verificando reglas...")
             self._reach_label.setText("")
 
-    def set_check_result(self, rule_count: int, reachable: bool):
+    def set_check_result(self, ip_count: int, rule_count: int, reachable: bool):
+        from datetime import datetime
+        self._ip_label.setText(f"IPs resueltas: {ip_count}   última actualización: {datetime.now().strftime('%H:%M:%S')}")
         # Reglas en iptables
         if rule_count == -1:
             self._rules_label.setStyleSheet(
@@ -262,7 +248,6 @@ class WebsitesPage(QWidget):
         for key, cfg in blocked.items():
             card = SiteCard(key, cfg)
             card.toggled.connect(self._on_toggle)
-            card.update_requested.connect(self._on_update_requested)
             card.check_requested.connect(self._on_check_requested)
             layout.addWidget(card)
             self._site_cards[key] = card
@@ -279,38 +264,21 @@ class WebsitesPage(QWidget):
         self._config["blocked_domains"][key]["enabled"] = enabled
         self.config_changed.emit(self._config)
 
-    def _on_update_requested(self, key: str):
-        card = self._site_cards.get(key)
-        if not card:
-            return
-        card.set_resolving(True)
-        domains = self._config.get("blocked_domains", BLOCKED_DOMAINS).get(key, {}).get("domains", [])
-        worker = _ResolveWorker(key, domains)
-        worker.finished.connect(self._on_resolved)
-        self._workers.append(worker)
-        worker.start()
-
     def _on_check_requested(self, key: str):
         card = self._site_cards.get(key)
         if not card:
             return
         card.set_checking(True)
         domains = self._config.get("blocked_domains", BLOCKED_DOMAINS).get(key, {}).get("domains", [])
-        worker = _CheckWorker(key, domains)
+        worker = _FullCheckWorker(key, domains)
         worker.finished.connect(self._on_check_done)
         self._workers.append(worker)
         worker.start()
 
-    def _on_resolved(self, key: str, ips: list[str]):
-        from datetime import datetime
+    def _on_check_done(self, key: str, ip_count: int, rule_count: int, reachable: bool):
         card = self._site_cards.get(key)
         if card:
-            card.set_ip_count(len(ips), datetime.now().strftime("%H:%M:%S"))
-
-    def _on_check_done(self, key: str, rule_count: int, reachable: bool):
-        card = self._site_cards.get(key)
-        if card:
-            card.set_check_result(rule_count, reachable)
+            card.set_check_result(ip_count, rule_count, reachable)
 
     def update_config(self, config: dict):
         self._config = config

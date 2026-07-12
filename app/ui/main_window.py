@@ -180,8 +180,8 @@ class MainWindow(QMainWindow):
             if hasattr(page, "config_changed"):
                 page.config_changed.connect(self._on_config_changed)
             # Botón Aplicar del dashboard conectado al método de la ventana
-            if page_id == "dashboard" and hasattr(page, "apply_requested"):
-                page.apply_requested.connect(self._apply_rules)
+            if page_id == "dashboard" and hasattr(page, "navigate_requested"):
+                page.navigate_requested.connect(self._navigate)
             self._pages[page_id] = page
             self._stack.addWidget(page)
 
@@ -208,21 +208,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._status_label)
         layout.addStretch()
 
-        btn_validate = QPushButton("Validar")
-        btn_validate.setObjectName("btn_secondary")
-        btn_validate.setToolTip("Verifica las reglas sin aplicarlas")
-        btn_validate.clicked.connect(self._validate_rules)
-        layout.addWidget(btn_validate)
-
-        btn_flush = QPushButton("Restaurar copia")
-        btn_flush.setObjectName("btn_secondary")
-        btn_flush.setToolTip("Restaura la ultima copia de seguridad")
-        btn_flush.clicked.connect(self._restore_last)
-        layout.addWidget(btn_flush)
-
         btn_reset = QPushButton("Resetear iptables")
         btn_reset.setObjectName("btn_danger")
-        btn_reset.setToolTip("Elimina TODAS las reglas iptables activas (tráfico queda abierto)")
+        btn_reset.setToolTip("Elimina TODAS las reglas iptables activas — tráfico queda abierto")
         btn_reset.clicked.connect(self._reset_iptables)
         if self._mode == "demo":
             btn_reset.setEnabled(False)

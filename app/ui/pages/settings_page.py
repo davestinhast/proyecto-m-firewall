@@ -45,6 +45,21 @@ class SettingsPage(QWidget):
         layout.addWidget(self._build_paths_card())
         layout.addWidget(self._build_behavior_card())
 
+        # Un solo botón Guardar para toda la página
+        self._save_error_lbl = QLabel("")
+        self._save_error_lbl.setStyleSheet("color: #D95C5C; font-size: 12px;")
+        layout.addWidget(self._save_error_lbl)
+
+        save_row = QHBoxLayout()
+        btn_save_all = QPushButton("Guardar configuración")
+        btn_save_all.setObjectName("btn_primary")
+        btn_save_all.setMinimumHeight(38)
+        btn_save_all.setMinimumWidth(200)
+        btn_save_all.clicked.connect(self._save_all)
+        save_row.addStretch()
+        save_row.addWidget(btn_save_all)
+        layout.addLayout(save_row)
+
         layout.addStretch()
         scroll.setWidget(container)
         main_layout.addWidget(scroll)
@@ -86,11 +101,6 @@ class SettingsPage(QWidget):
         layout.addWidget(self._net_error)
 
         btn_row = QHBoxLayout()
-        btn_save = QPushButton("Guardar")
-        btn_save.setObjectName("btn_primary")
-        btn_save.clicked.connect(self._save_network)
-        btn_row.addWidget(btn_save)
-
         btn_detect = QPushButton("Detectar automáticamente")
         btn_detect.setObjectName("btn_secondary")
         btn_detect.clicked.connect(self._auto_detect)
@@ -251,14 +261,6 @@ class SettingsPage(QWidget):
         form.addRow("Archivo de logs rechazados:", self._log_path_input)
         layout.addLayout(form)
 
-        btn_row = QHBoxLayout()
-        btn_save_paths = QPushButton("Guardar rutas")
-        btn_save_paths.setObjectName("btn_primary")
-        btn_save_paths.clicked.connect(self._save_paths)
-        btn_row.addWidget(btn_save_paths)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-
         return frame
 
     def _build_behavior_card(self) -> QFrame:
@@ -286,14 +288,6 @@ class SettingsPage(QWidget):
         form.addRow("Intervalo de actualización de IPs:", self._refresh_spin)
         form.addRow("Acción predeterminada:", self._action_combo)
         layout.addLayout(form)
-
-        btn_row = QHBoxLayout()
-        btn_save = QPushButton("Guardar comportamiento")
-        btn_save.setObjectName("btn_primary")
-        btn_save.clicked.connect(self._save_behavior)
-        btn_row.addWidget(btn_save)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
 
         return frame
 
@@ -349,6 +343,24 @@ class SettingsPage(QWidget):
         self._config["domain_refresh_interval"] = self._refresh_spin.value()
         self._config["default_action"] = self._action_combo.currentText()
         self.config_changed.emit(self._config)
+
+    def _save_all(self):
+        """Guarda todas las secciones en un solo paso."""
+        # Validar red primero
+        if self._server_ip_input.text().strip():
+            ok, msg = validators.validate_ipv4(self._server_ip_input.text())
+            if not ok:
+                self._save_error_lbl.setText(f"IP servidor: {msg}")
+                return
+        if self._client_net_input.text().strip():
+            ok, msg = validators.validate_cidr(self._client_net_input.text())
+            if not ok:
+                self._save_error_lbl.setText(f"Red cliente: {msg}")
+                return
+        self._save_error_lbl.setText("")
+        self._save_network()
+        self._save_paths()
+        self._save_behavior()
 
     def _auto_detect(self):
         ip, iface = network_service.get_own_ip_and_interface()

@@ -125,15 +125,19 @@ class CliSrvPage(QWidget):
 
         self._srv_ip_input = QLineEdit()
         self._srv_ip_input.setPlaceholderText("ej: 192.168.50.1")
+        self._srv_ip_input.editingFinished.connect(self._on_save)
         self._cli_ip_input = QLineEdit()
         self._cli_ip_input.setPlaceholderText("ej: 192.168.50.10")
+        self._cli_ip_input.editingFinished.connect(self._on_save)
 
         self._iface_combo = QComboBox()
         self._iface_combo.addItem("(cualquier interfaz)")
         self._iface_combo.addItems(network_service.get_available_interfaces())
+        self._iface_combo.currentIndexChanged.connect(self._on_save)
 
         self._action_combo = QComboBox()
         self._action_combo.addItems(["DROP", "REJECT"])
+        self._action_combo.currentIndexChanged.connect(self._on_save)
 
         self._proto_tcp = QCheckBox("TCP")
         self._proto_udp = QCheckBox("UDP")
@@ -156,14 +160,6 @@ class CliSrvPage(QWidget):
         self._error_label = QLabel("")
         self._error_label.setStyleSheet("color: #D95C5C; font-size: 12px;")
         layout.addWidget(self._error_label)
-
-        btn_row = QHBoxLayout()
-        btn_save = QPushButton("Guardar configuración")
-        btn_save.setObjectName("btn_primary")
-        btn_save.clicked.connect(self._on_save)
-        btn_row.addWidget(btn_save)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
 
         return frame
 
@@ -197,15 +193,20 @@ class CliSrvPage(QWidget):
             self._action_combo.setCurrentIndex(idx)
 
     def _on_save(self):
-        srv_ok, srv_msg = validators.validate_ipv4(self._srv_ip_input.text())
-        cli_ok, cli_msg = validators.validate_ipv4(self._cli_ip_input.text())
+        srv_text = self._srv_ip_input.text().strip()
+        cli_text = self._cli_ip_input.text().strip()
 
-        if not srv_ok:
-            self._error_label.setText(f"IP servidor: {srv_msg}")
-            return
-        if not cli_ok:
-            self._error_label.setText(f"IP cliente: {cli_msg}")
-            return
+        # Solo validar si hay texto (campos vacíos se guardan como "")
+        if srv_text:
+            srv_ok, srv_msg = validators.validate_ipv4(srv_text)
+            if not srv_ok:
+                self._error_label.setText(f"IP servidor: {srv_msg}")
+                return
+        if cli_text:
+            cli_ok, cli_msg = validators.validate_ipv4(cli_text)
+            if not cli_ok:
+                self._error_label.setText(f"IP cliente: {cli_msg}")
+                return
 
         self._error_label.setText("")
         protocols = []
@@ -218,8 +219,8 @@ class CliSrvPage(QWidget):
         iface = self._iface_combo.currentText()
         self._config["clisrv"] = {
             "enabled": self._enabled_toggle.isChecked(),
-            "server_ip": validators.normalize_ip(self._srv_ip_input.text()),
-            "client_ip": validators.normalize_ip(self._cli_ip_input.text()),
+            "server_ip": validators.normalize_ip(srv_text) if srv_text else "",
+            "client_ip": validators.normalize_ip(cli_text) if cli_text else "",
             "interface": "" if "(cualquier" in iface else iface,
             "protocols": protocols,
             "action": self._action_combo.currentText(),
