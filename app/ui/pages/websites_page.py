@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QPushButton, QApplication, QGridLayout,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
-from app.ui.widgets.toggle_switch import ToggleSwitch
+from PySide6.QtWidgets import QCheckBox
 from app.constants import BLOCKED_DOMAINS
 
 
@@ -272,7 +272,7 @@ class SiteCard(QFrame):
         top_row.addWidget(self._badge)
         top_row.addStretch()
 
-        self._toggle = ToggleSwitch()
+        self._toggle = QCheckBox("Habilitar este dominio")
         self._toggle.setChecked(self._cfg.get("enabled", False))
         self._toggle.toggled.connect(lambda checked: self.toggled.emit(self._key, checked))
         top_row.addWidget(self._toggle)

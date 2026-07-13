@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QFormLayout,
 )
 from PySide6.QtCore import Qt, Signal
-from app.ui.widgets.toggle_switch import ToggleSwitch
+from PySide6.QtWidgets import QCheckBox
 from app.core import validators
 from app.services import network_service
 
@@ -114,7 +114,7 @@ class CliSrvPage(QWidget):
         subtitle.setObjectName("label_subtitle")
         top_row.addWidget(subtitle)
         top_row.addStretch()
-        self._enabled_toggle = ToggleSwitch()
+        self._enabled_toggle = QCheckBox("Habilitar")
         self._enabled_toggle.toggled.connect(self._on_save)
         top_row.addWidget(QLabel("Activar regla:"))
         top_row.addWidget(self._enabled_toggle)
