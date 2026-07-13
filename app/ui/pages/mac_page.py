@@ -55,7 +55,7 @@ class AddMacDialog(QDialog):
         layout.addLayout(form)
 
         self._error_label = QLabel("")
-        self._error_label.setStyleSheet("color: #D95C5C; font-size: 12px;")
+        self._error_label.setStyleSheet("color: #ff3333; font-size: 12px; background: transparent;")
         layout.addWidget(self._error_label)
 
         buttons = QDialogButtonBox(

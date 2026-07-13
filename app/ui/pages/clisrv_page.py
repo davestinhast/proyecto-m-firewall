@@ -67,29 +67,29 @@ class CliSrvPage(QWidget):
             lbl = QLabel(text)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(
-                f"background-color: #1B2A47; color: {color}; "
-                "border: 1px solid #2B3E5C; border-radius: 6px; "
+                f"background-color: #0c0c0c; color: {color}; "
+                "border: 1px solid #333333; border-radius: 6px; "
                 "padding: 12px 20px; font-weight: 600; font-size: 13px;"
             )
             return lbl
 
-        self._srv_label = box("SERVIDOR\n192.168.50.1", "#4F7DF3")
+        self._srv_label = box("SERVIDOR\n192.168.50.1", "#ff3333")
         self._allow_arrow = QLabel("  ──────────────▶  ")
         self._allow_arrow.setObjectName("label_secondary")
         self._allow_arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._cli_label = box("CLIENTE\n192.168.50.10", "#3CB371")
+        self._cli_label = box("CLIENTE\n192.168.50.10", "#22c55e")
 
         self._block_row = QHBoxLayout()
         self._block_row.setSpacing(0)
         block_arrow = QLabel("  ━━━━━━━━━━ ✕ ━━▶  ")
         block_arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        block_arrow.setStyleSheet("color: #D95C5C; font-weight: 700;")
+        block_arrow.setStyleSheet("color: #ff3333; font-weight: 700; background: transparent;")
 
-        allow_text = QLabel("Servidor → Cliente: PERMITIDO")
-        allow_text.setObjectName("status_active")
-        block_text = QLabel("Cliente → Servidor (NEW): BLOQUEADO")
-        block_text.setObjectName("status_inactive")
+        allow_text = QLabel("✓ Servidor → Cliente: PERMITIDO")
+        allow_text.setStyleSheet("color: #22c55e; font-weight: bold; background: transparent;")
+        block_text = QLabel("✗ Cliente → Servidor (NEW): BLOQUEADO")
+        block_text.setStyleSheet("color: #ff3333; font-weight: bold; background: transparent;")
 
         row.addWidget(self._srv_label)
         row.addWidget(self._allow_arrow)
@@ -158,7 +158,7 @@ class CliSrvPage(QWidget):
         layout.addLayout(form)
 
         self._error_label = QLabel("")
-        self._error_label.setStyleSheet("color: #D95C5C; font-size: 12px;")
+        self._error_label.setStyleSheet("color: #ff3333; font-size: 12px; background: transparent;")
         layout.addWidget(self._error_label)
 
         return frame

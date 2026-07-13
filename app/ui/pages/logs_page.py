@@ -36,8 +36,6 @@ class LogsPage(QWidget):
 
         self._text_area = QTextEdit()
         self._text_area.setReadOnly(True)
-        # Use simple monospace font
-        self._text_area.setStyleSheet("font-family: Consolas, monospace; background-color: #ffffff; color: #000000;")
         layout.addWidget(self._text_area)
 
         btn_layout = QHBoxLayout()

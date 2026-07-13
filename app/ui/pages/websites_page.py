@@ -143,9 +143,9 @@ class _PrereqCard(QFrame):
         self._gw_win_cmd = QLabel("—")
         self._gw_win_cmd.setWordWrap(True)
         self._gw_win_cmd.setStyleSheet(
-            "background-color: #1B2A47; color: #E2EAFA; "
+            "background-color: #0d0d0d; color: #cccccc; "
             "font-family: 'Consolas','Courier New',monospace; font-size: 11px; "
-            "border-radius: 4px; padding: 6px 10px;"
+            "border: 1px solid #222222; border-radius: 4px; padding: 6px 10px;"
         )
         btn_copy_win = QPushButton("Copiar")
         btn_copy_win.setObjectName("btn_small")
@@ -155,9 +155,9 @@ class _PrereqCard(QFrame):
         lin_lbl.setObjectName("label_hint")
         self._gw_lin_cmd = QLabel("—")
         self._gw_lin_cmd.setStyleSheet(
-            "background-color: #1B2A47; color: #22c55e; "
+            "background-color: #0d0d0d; color: #22c55e; "
             "font-family: 'Consolas','Courier New',monospace; font-size: 11px; "
-            "border-radius: 4px; padding: 6px 10px;"
+            "border: 1px solid #222222; border-radius: 4px; padding: 6px 10px;"
         )
         btn_copy_lin = QPushButton("Copiar")
         btn_copy_lin.setObjectName("btn_small")
@@ -184,12 +184,11 @@ class _PrereqCard(QFrame):
                 self._btn_enable_ipfwd.setVisible(False)
             else:
                 self._ipfwd_lbl.setText("✗  IP Forward: INACTIVO — los paquetes no se reenvían")
-                self._ipfwd_lbl.setStyleSheet("color: #ef4444; font-size: 12px; background: transparent;")
+                self._ipfwd_lbl.setStyleSheet("color: #ff3333; font-size: 12px; background: transparent;")
                 self._btn_enable_ipfwd.setVisible(True)
         else:
             self._ipfwd_lbl.setText("—  IP Forward: no aplica (modo demo)")
-            self._ipfwd_lbl.setStyleSheet("color: #8AAABB; font-size: 12px; background: transparent;")
-            self._btn_enable_ipfwd.setVisible(False)
+            self._ipfwd_lbl.setStyleSheet("color: #888888; font-size: 12px; background: transparent;")
 
         if is_linux():
             masq = False
@@ -254,60 +253,75 @@ class SiteCard(QFrame):
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(10)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 12, 16, 12)
+        main_layout.setSpacing(8)
 
-        # Top: nombre + badge + toggle
-        top_row = QHBoxLayout()
+        content_row = QHBoxLayout()
+        content_row.setSpacing(16)
+
+        # Left Info
+        left_layout = QVBoxLayout()
         label_name = QLabel(self._cfg["label"])
         label_name.setObjectName("label_subtitle")
-        top_row.addWidget(label_name)
-        top_row.addSpacing(12)
+        left_layout.addWidget(label_name)
 
-        self._badge = QLabel("⚪  Sin verificar")
-        self._badge.setStyleSheet(
-            "color: #5C7A95; font-size: 12px; font-weight: 600; background: transparent;"
-        )
-        top_row.addWidget(self._badge)
-        top_row.addStretch()
+        self._badge = QLabel("⚪ Sin verificar")
+        self._badge.setStyleSheet("font-size: 11px; font-weight: bold; background: transparent;")
+        left_layout.addWidget(self._badge)
+        left_layout.addStretch()
+        content_row.addLayout(left_layout, stretch=1)
 
-        self._toggle = QCheckBox("Habilitar este dominio")
-        self._toggle.setChecked(self._cfg.get("enabled", False))
-        self._toggle.toggled.connect(lambda checked: self.toggled.emit(self._key, checked))
-        top_row.addWidget(self._toggle)
-        layout.addLayout(top_row)
-
-        # Descripción + dominios
+        # Middle Info
+        mid_layout = QVBoxLayout()
         desc = QLabel(self._cfg.get("description", ""))
-        desc.setObjectName("label_secondary")
-        layout.addWidget(desc)
+        desc.setObjectName("label_hint")
+        mid_layout.addWidget(desc)
 
-        domains_lbl = QLabel("  ".join(self._cfg.get("domains", [])))
+        domains_lbl = QLabel(", ".join(self._cfg.get("domains", [])))
         domains_lbl.setObjectName("label_secondary")
         domains_lbl.setWordWrap(True)
-        layout.addWidget(domains_lbl)
+        mid_layout.addWidget(domains_lbl)
+        mid_layout.addStretch()
+        content_row.addLayout(mid_layout, stretch=3)
 
-        # Detail row: IPs + reglas + botón verificar
+        # Right Controls
+        right_layout = QVBoxLayout()
+        self._toggle = QCheckBox("Habilitar")
+        self._toggle.setChecked(self._cfg.get("enabled", False))
+        self._toggle.toggled.connect(lambda checked: self.toggled.emit(self._key, checked))
+        right_layout.addWidget(self._toggle, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self._btn_check = QPushButton("Verificar")
+        self._btn_check.setObjectName("btn_small")
+        self._btn_check.clicked.connect(lambda: self.check_requested.emit(self._key))
+        right_layout.addWidget(self._btn_check, alignment=Qt.AlignmentFlag.AlignRight)
+        content_row.addLayout(right_layout, stretch=1)
+
+        main_layout.addLayout(content_row)
+
+        # Separator line
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #222222; background-color: #222222; max-height: 1px;")
+        main_layout.addWidget(sep)
+
+        # Detail/Status row (Bottom)
         detail_row = QHBoxLayout()
         self._ip_label = QLabel("IPs: —")
         self._ip_label.setObjectName("label_mono")
         detail_row.addWidget(self._ip_label)
-        detail_row.addSpacing(24)
-        self._rules_label = QLabel("Reglas iptables: —")
+
+        self._rules_label = QLabel("Reglas: —")
         self._rules_label.setObjectName("label_mono")
         detail_row.addWidget(self._rules_label)
-        detail_row.addStretch()
-        self._btn_check = QPushButton("Verificar ahora")
-        self._btn_check.setObjectName("btn_small")
-        self._btn_check.clicked.connect(lambda: self.check_requested.emit(self._key))
-        detail_row.addWidget(self._btn_check)
-        layout.addLayout(detail_row)
 
-        # Nota conectividad Kali
         self._reach_label = QLabel("")
         self._reach_label.setObjectName("label_secondary")
-        layout.addWidget(self._reach_label)
+        detail_row.addWidget(self._reach_label)
+        detail_row.addStretch()
+
+        main_layout.addLayout(detail_row)
 
     def set_checking(self, checking: bool):
         self._btn_check.setEnabled(not checking)
@@ -324,46 +338,45 @@ class SiteCard(QFrame):
         if rule_count == -1:
             self._badge.setText("⚪  No disponible (modo demo)")
             self._badge.setStyleSheet(
-                "color: #5C7A95; font-size: 12px; font-weight: 600; background: transparent;"
+                "color: #888888; font-size: 11px; font-weight: 600; background: transparent;"
             )
             self._rules_label.setStyleSheet(
-                "color: #8AAABB; font-size: 11px; background: transparent;"
+                "color: #888888; font-size: 11px; background: transparent;"
             )
-            self._rules_label.setText("Reglas iptables: —")
+            self._rules_label.setText("Reglas: —")
             self._reach_label.setText("")
         elif rule_count == 0:
-            self._badge.setText("🟢  ACCESIBLE — sin bloqueo activo")
+            self._badge.setText("🟢  ACCESIBLE")
             self._badge.setStyleSheet(
-                "color: #22c55e; font-size: 12px; font-weight: 600; background: transparent;"
+                "color: #22c55e; font-size: 11px; font-weight: 600; background: transparent;"
             )
             self._rules_label.setStyleSheet(
-                "color: #ef4444; font-weight: 600; font-size: 11px; background: transparent;"
+                "color: #ff3333; font-weight: 600; font-size: 11px; background: transparent;"
             )
-            self._rules_label.setText("Reglas iptables: 0  ← aplica las reglas primero")
+            self._rules_label.setText("Reglas: 0 (inactivas)")
         else:
             self._badge.setText("🔴  BLOQUEADO")
             self._badge.setStyleSheet(
-                "color: #ef4444; font-size: 12px; font-weight: 600; background: transparent;"
+                "color: #ff3333; font-size: 11px; font-weight: 600; background: transparent;"
             )
             self._rules_label.setStyleSheet(
                 "color: #22c55e; font-weight: 600; font-size: 11px; background: transparent;"
             )
-            self._rules_label.setText(f"Reglas iptables: {rule_count}  ✓ activas")
+            self._rules_label.setText(f"Reglas: {rule_count} (activas)")
 
         if rule_count != -1:
             if reachable:
                 self._reach_label.setStyleSheet(
-                    "color: #f59e0b; font-size: 11px; background: transparent;"
+                    "color: #ffaa00; font-size: 11px; background: transparent;"
                 )
                 self._reach_label.setText(
-                    "Desde Kali: alcanzable  "
-                    "(normal — Kali usa OUTPUT, no FORWARD; solo los clientes quedan bloqueados)"
+                    "|   Desde Kali: alcanzable (el bloqueo es para clientes)"
                 )
             else:
                 self._reach_label.setStyleSheet(
-                    "color: #8AAABB; font-size: 11px; background: transparent;"
+                    "color: #888888; font-size: 11px; background: transparent;"
                 )
-                self._reach_label.setText("Desde Kali: sin respuesta TCP 443")
+                self._reach_label.setText("|   Desde Kali: sin respuesta TCP 443")
 
         self._btn_check.setEnabled(True)
 
