@@ -1,0 +1,90 @@
+/* Full Black Theme with Red Accents */
+
+QWidget {
+    background-color: transparent;
+    color: #FFFFFF;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+QMainWindow {
+    background-color: #000000;
+}
+
+QTabWidget::pane {
+    border: 1px solid #333333;
+    background-color: rgba(0, 0, 0, 0.75); /* Translucent black */
+    border-radius: 4px;
+}
+
+QTabBar::tab {
+    background-color: rgba(17, 17, 17, 0.9);
+    color: #AAAAAA;
+    padding: 10px 20px;
+    border: 1px solid #333333;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #FFFFFF;
+    border-bottom: 1px solid transparent; /* Merge with pane */
+}
+
+QPushButton {
+    background-color: #222222;
+    color: #FFFFFF;
+    border: 1px solid #444444;
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #7b0d0d; /* Dark Red accent matching Quake logo */
+    border-color: #a81212;
+}
+
+QPushButton:disabled {
+    background-color: #111111;
+    color: #555555;
+    border-color: #222222;
+}
+
+QCheckBox {
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #555555;
+    background-color: #111111;
+    border-radius: 3px;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #7b0d0d;
+    border: 1px solid #a81212;
+}
+
+QComboBox, QLineEdit, QSpinBox {
+    background-color: #111111;
+    border: 1px solid #444444;
+    padding: 5px;
+    border-radius: 4px;
+    color: #FFFFFF;
+}
+
+QTextEdit {
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #FFFFFF;
+    border: 1px solid #333333;
+    font-family: Consolas, monospace;
+}
+
+QMessageBox {
+    background-color: #000000;
+}

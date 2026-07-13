@@ -19,6 +19,13 @@ from app.core.configuration import save_config
 from app.services import network_service
 from app.workers.apply_worker import ApplyWorker, ValidateWorker
 
+def _load_stylesheet() -> str:
+    qss_path = Path(__file__).parent.parent / "resources" / "styles" / "main.qss"
+    if qss_path.exists():
+        return qss_path.read_text(encoding="utf-8")
+    return ""
+
+
 from app.ui.pages.websites_page import WebsitesPage
 from app.ui.pages.clisrv_page import CliSrvPage
 from app.ui.pages.mac_page import MacPage
@@ -39,6 +46,18 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} - Administrador de Reglas")
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+        self.setStyleSheet(_load_stylesheet())
+        
+        bg_path = Path(__file__).parent.parent / "resources" / "bg.png"
+        bg_path_str = str(bg_path).replace("\\", "/")
+        self.setStyleSheet(self.styleSheet() + f"""
+            QMainWindow {{
+                background-image: url('{bg_path_str}');
+                background-position: center;
+                background-repeat: no-repeat;
+                background-color: #000000;
+            }}
+        """)
 
         self._build_ui()
 
