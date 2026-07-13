@@ -141,27 +141,39 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
 
     # === Bloqueo sitios web ===
     blocked_domains = config.get("blocked_domains", {})
-    if blocked_domains and resolved_ips:
-        lines.append(f"# --- Cadena {CHAIN_WEBBLOCK}: bloqueo por IP de dominios ---")
+    if blocked_domains:
+        lines.append(f"# --- Cadena {CHAIN_WEBBLOCK}: bloqueo por IP e inspección de texto ---")
         for key, domain_cfg in blocked_domains.items():
             if not domain_cfg.get("enabled", False):
                 continue
             label = domain_cfg.get("label", key)
             ips = resolved_ips.get(key, [])
-            if not ips:
-                continue
-            lines.append(f"# {label} ({len(ips)} IPs resueltas)")
-            for ip in ips:
-                for port in WEB_BLOCK_PORTS:
-                    lines.append(
-                        f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport {port} "
-                        f"-j {IPTABLES_CHAIN_REJECT}"
-                    )
-                for port in WEB_BLOCK_UDP_PORTS:
-                    lines.append(
-                        f"-A {CHAIN_WEBBLOCK} -p udp -d {ip} --dport {port} "
-                        f"-j {IPTABLES_CHAIN_REJECT}"
-                    )
+            domains = domain_cfg.get("domains", [])
+            
+            # Bloqueo por IP
+            if ips:
+                lines.append(f"# {label} ({len(ips)} IPs resueltas)")
+                for ip in ips:
+                    for port in WEB_BLOCK_PORTS:
+                        lines.append(
+                            f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport {port} "
+                            f"-j {IPTABLES_CHAIN_REJECT}"
+                        )
+                    for port in WEB_BLOCK_UDP_PORTS:
+                        lines.append(
+                            f"-A {CHAIN_WEBBLOCK} -p udp -d {ip} --dport {port} "
+                            f"-j {IPTABLES_CHAIN_REJECT}"
+                        )
+            
+            # Bloqueo por String (inspección de texto plano SNI en HTTPS / Host en HTTP)
+            if domains:
+                lines.append(f"# {label} (Bloqueo por inspección de texto)")
+                for dom in domains:
+                    if len(dom) > 3:
+                        lines.append(
+                            f"-A {CHAIN_WEBBLOCK} -m string --string \"{dom}\" --algo bm "
+                            f"-j {IPTABLES_CHAIN_REJECT}"
+                        )
         lines.append("")
 
     # === Saltos desde FORWARD hacia las cadenas personalizadas ===
