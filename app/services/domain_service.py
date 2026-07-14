@@ -97,6 +97,19 @@ def resolve_all_domains(blocked_domains: dict, progress_cb: Optional[Callable] =
     return result
 
 
+def _is_valid_ipv4(ip: str) -> bool:
+    """Valida si una cadena es una direccion IPv4 sintacticamente correcta."""
+    if not ip or not isinstance(ip, str):
+        return False
+    parts = ip.strip().split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
+
+
 def build_ipset_file(resolved: dict[str, list[str]]) -> str:
     """Genera contenido del archivo .ipset para ipset restore."""
     lines = [
@@ -110,7 +123,8 @@ def build_ipset_file(resolved: dict[str, list[str]]) -> str:
         lines.append(f"create {set_name} hash:ip family inet hashsize 1024 maxelem 65536 -exist")
         lines.append(f"flush {set_name}")
         for ip in ips:
-            lines.append(f"add {set_name} {ip}")
+            if _is_valid_ipv4(ip):
+                lines.append(f"add {set_name} {ip.strip()}")
         lines.append("")
     return "\n".join(lines)
 
