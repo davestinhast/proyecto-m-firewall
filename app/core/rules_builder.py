@@ -67,6 +67,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         f":{CHAIN_MACBLOCK} - [0:0]",
         f":{CHAIN_CONNLIMIT} - [0:0]",
         f":{CHAIN_CLISRV} - [0:0]",
+        ":PM_DNSBLOCK - [0:0]",
         f":{IPTABLES_CHAIN_REJECT} - [0:0]",
         ":INPUT ACCEPT [0:0]",
         ":FORWARD ACCEPT [0:0]",
@@ -194,25 +195,25 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             # Agregamos DoH domains para cegar el DNS cifrado del navegador
             keywords = ["facebook", "youtube", "hotmail", "outlook", "dns.google", "cloudflare-dns", "dns.quad9"]
             for kw in keywords:
-                # Bloquear consultas (dport 53) y respuestas (sport 53) en UDP
+                # Bloquear consultas (dport 53) y respuestas (sport 53) en UDP en la cadena PM_DNSBLOCK
                 lines.append(
-                    f"-A {CHAIN_WEBBLOCK} -p udp --dport 53 "
+                    f"-A PM_DNSBLOCK -p udp --dport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
                 lines.append(
-                    f"-A {CHAIN_WEBBLOCK} -p udp --sport 53 "
+                    f"-A PM_DNSBLOCK -p udp --sport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
                 # Bloquear en TCP
                 lines.append(
-                    f"-A {CHAIN_WEBBLOCK} -p tcp --dport 53 "
+                    f"-A PM_DNSBLOCK -p tcp --dport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
                 lines.append(
-                    f"-A {CHAIN_WEBBLOCK} -p tcp --sport 53 "
+                    f"-A PM_DNSBLOCK -p tcp --sport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
@@ -222,17 +223,45 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     iface_in = f"-i {lan} " if lan else ""
 
     lines += [
-        "# --- Saltos INPUT → cadenas personalizadas (tráfico directo a Kali) ---",
+        "# --- Saltos INPUT → cadenas personalizadas ---",
         f"-A INPUT -j {CHAIN_WEBBLOCK}",
+    ]
+
+    if config.get("aggressive_dns", False):
+        lines += [
+            f"-A INPUT -p udp --dport 53 -j PM_DNSBLOCK",
+            f"-A INPUT -p tcp --dport 53 -j PM_DNSBLOCK",
+        ]
+
+    lines += [
         "",
         "# --- Saltos FORWARD → cadenas personalizadas (tráfico de clientes) ---",
         f"-A FORWARD {iface_in}-j {CHAIN_MACBLOCK}",
         f"-A FORWARD {iface_in}-j {CHAIN_CONNLIMIT}",
         f"-A FORWARD {iface_in}-j {CHAIN_CLISRV}",
         f"-A FORWARD {iface_in}-j {CHAIN_WEBBLOCK}",
+    ]
+
+    if config.get("aggressive_dns", False):
+        lines += [
+            f"-A FORWARD -p udp --dport 53 -j PM_DNSBLOCK",
+            f"-A FORWARD -p tcp --dport 53 -j PM_DNSBLOCK",
+        ]
+
+    lines += [
         "",
         "# --- Saltos OUTPUT → PM_WEBBLOCK (bloqueo también desde la propia máquina Kali) ---",
         f"-A OUTPUT -j {CHAIN_WEBBLOCK}",
+    ]
+
+    if config.get("aggressive_dns", False):
+        # En OUTPUT excluimos al usuario root (UID 0) para que la propia app pueda resolver
+        lines += [
+            f"-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK",
+            f"-A OUTPUT -p tcp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK",
+        ]
+
+    lines += [
         "",
         "COMMIT",
         "",
