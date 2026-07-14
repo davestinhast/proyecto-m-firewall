@@ -153,27 +153,96 @@ def flush_all() -> tuple[bool, str]:
     if get_mode() == "demo":
         return False, "Modo demostracion."
 
-    rc, _, err = command_runner.run_iptables(["-F"])
-    if rc != 0:
-        return False, err
-    command_runner.run_iptables(["-X"])
-    command_runner.run_iptables(["-t", "nat", "-F"])
-    command_runner.run_iptables(["-t", "nat", "-X"])
-    command_runner.run_iptables(["-t", "mangle", "-F"])
-    command_runner.run_iptables(["-t", "mangle", "-X"])
+    # Limpiar tablas principales
+    for table in ["filter", "nat", "mangle", "raw", "security"]:
+        command_runner.run_iptables(["-t", table, "-F"])
+        command_runner.run_iptables(["-t", table, "-X"])
+
+    # Políticas por defecto a ACCEPT
     command_runner.run_iptables(["-P", "INPUT", "ACCEPT"])
     command_runner.run_iptables(["-P", "FORWARD", "ACCEPT"])
     command_runner.run_iptables(["-P", "OUTPUT", "ACCEPT"])
 
-    command_runner.run(["ip6tables", "-F"])
-    command_runner.run(["ip6tables", "-X"])
+    # IPv6
+    for table in ["filter", "nat", "mangle", "raw", "security"]:
+        command_runner.run(["ip6tables", "-t", table, "-F"])
+        command_runner.run(["ip6tables", "-t", table, "-X"])
     command_runner.run(["ip6tables", "-P", "INPUT", "ACCEPT"])
     command_runner.run(["ip6tables", "-P", "FORWARD", "ACCEPT"])
     command_runner.run(["ip6tables", "-P", "OUTPUT", "ACCEPT"])
 
+    # nftables
     command_runner.run(["nft", "flush", "ruleset"])
 
     return True, "Todas las reglas eliminadas (IPv4, IPv6 y nftables)."
+
+
+def deep_reset_network() -> tuple[bool, str]:
+    """
+    Realiza una limpieza profunda y reparacion de la red del sistema:
+    1. Ejecuta flush_all() (vaciar iptables/ip6tables/nftables).
+    2. Destruye todos los conjuntos ipset.
+    3. Elimina lineas de bloqueo en /etc/hosts.
+    4. Agrega nameservers publicos a /etc/resolv.conf para restaurar DNS.
+    """
+    if get_mode() == "demo":
+        return False, "Modo demostracion — no se puede ejecutar en Windows."
+
+    log_msgs = []
+
+    # 1. Vaciar reglas de firewall
+    ok, msg = flush_all()
+    log_msgs.append(msg)
+
+    # 2. Destruir conjuntos ipset
+    try:
+        r = subprocess.run(["ipset", "destroy"], capture_output=True, text=True, timeout=10)
+        if r.returncode == 0:
+            log_msgs.append("Conjuntos ipset destruidos correctamente.")
+        else:
+            log_msgs.append(f"Nota al destruir ipset: {r.stderr.strip()}")
+    except Exception as e:
+        log_msgs.append(f"No se pudo limpiar ipset: {e}")
+
+    # 3. Limpiar /etc/hosts
+    hosts_path = Path("/etc/hosts")
+    if hosts_path.exists():
+        try:
+            lines = hosts_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            clean_lines = []
+            removed_count = 0
+            block_keywords = ["facebook", "youtube", "hotmail", "live.com", "outlook", "fbcdn"]
+            for line in lines:
+                if any(kw in line.lower() for kw in block_keywords) and not line.strip().startswith("#"):
+                    removed_count += 1
+                else:
+                    clean_lines.append(line)
+            if removed_count > 0:
+                hosts_path.write_text("\n".join(clean_lines) + "\n", encoding="utf-8")
+                log_msgs.append(f"Se eliminaron {removed_count} lineas de bloqueo de /etc/hosts.")
+            else:
+                log_msgs.append("/etc/hosts sin bloqueos activos.")
+        except Exception as e:
+            log_msgs.append(f"Error al limpiar /etc/hosts: {e}")
+
+    # 4. Restaurar /etc/resolv.conf
+    resolv_path = Path("/etc/resolv.conf")
+    try:
+        # Agregar DNS de Google y Cloudflare
+        dns_lines = [
+            "# Generado por M-FIREWALL Deep Reset",
+            "nameserver 8.8.8.8",
+            "nameserver 1.1.1.1",
+            "nameserver 8.8.4.4"
+        ]
+        # Escribir o anexar
+        resolv_path.write_text("\n".join(dns_lines) + "\n", encoding="utf-8")
+        log_msgs.append("DNS restablecido en /etc/resolv.conf (nameservers 8.8.8.8 y 1.1.1.1 agregados).")
+    except Exception as e:
+        log_msgs.append(f"Error al escribir en /etc/resolv.conf: {e}")
+
+    return True, "\n".join(log_msgs)
+
 
 
 def get_active_rules() -> tuple[bool, str]:

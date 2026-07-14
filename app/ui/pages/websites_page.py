@@ -88,7 +88,7 @@ class _RefreshIpsetWorker(QThread):
 
 
 class _DiagWorker(QThread):
-    """Ejecuta comandos de diagnostico y devuelve el output completo."""
+    """Ejecuta comandos de diagnostico detallados y devuelve el output completo."""
     finished = Signal(str)
 
     def run(self):
@@ -96,8 +96,39 @@ class _DiagWorker(QThread):
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         lines.append(f"=== Diagnostico M-FIREWALL [{ts}] ===\n")
 
-        # 1. ipset instalado?
-        lines.append("--- ipset ---")
+        # 1. Resolucion DNS general
+        lines.append("--- Resolucion DNS general ---")
+        try:
+            ip = socket.gethostbyname("google.com")
+            lines.append(f"  google.com se resuelve a: {ip} (DNS funciona)")
+        except Exception as e:
+            lines.append(f"  [ERROR] No se pudo resolver google.com: {e}")
+
+        # 2. Contenido de /etc/resolv.conf
+        lines.append("\n--- Contenido de /etc/resolv.conf (Servidores DNS) ---")
+        from pathlib import Path
+        resolv = Path("/etc/resolv.conf")
+        if resolv.exists():
+            try:
+                lines.append(resolv.read_text(encoding="utf-8", errors="ignore").strip())
+            except Exception as e:
+                lines.append(f"  [ERROR] Al leer /etc/resolv.conf: {e}")
+        else:
+            lines.append("  /etc/resolv.conf no existe.")
+
+        # 3. Contenido de /etc/hosts
+        lines.append("\n--- Contenido de /etc/hosts ---")
+        hosts = Path("/etc/hosts")
+        if hosts.exists():
+            try:
+                lines.append(hosts.read_text(encoding="utf-8", errors="ignore").strip())
+            except Exception as e:
+                lines.append(f"  [ERROR] Al leer /etc/hosts: {e}")
+        else:
+            lines.append("  /etc/hosts no existe.")
+
+        # 4. ipset instalado?
+        lines.append("\n--- ipset ---")
         try:
             r = subprocess.run(["ipset", "version"], capture_output=True, text=True, timeout=5)
             lines.append(r.stdout.strip() or "ipset disponible")
@@ -106,7 +137,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"[ERROR] {e}")
 
-        # 2. Sets de ipset activos
+        # 5. Sets de ipset activos
         lines.append("\n--- Sets ipset activos (PM_*) ---")
         for key in ["FACEBOOK", "YOUTUBE", "HOTMAIL"]:
             set_name = f"PM_{key}"
@@ -126,7 +157,7 @@ class _DiagWorker(QThread):
             except Exception as e:
                 lines.append(f"  {set_name}: {e}")
 
-        # 3. iptables chains PM_*
+        # 6. iptables chains PM_*
         lines.append("\n--- iptables chain PM_WEBBLOCK ---")
         try:
             r = subprocess.run(
@@ -142,7 +173,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"[ERROR] {e}")
 
-        # 4. iptables OUTPUT hacia PM_WEBBLOCK
+        # 7. iptables OUTPUT hacia PM_WEBBLOCK
         lines.append("\n--- iptables OUTPUT (bloqueo desde Kali) ---")
         try:
             r = subprocess.run(
@@ -157,7 +188,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"[ERROR] {e}")
 
-        # 5. iptables FORWARD
+        # 8. iptables FORWARD
         lines.append("\n--- iptables FORWARD (bloqueo para clientes) ---")
         try:
             r = subprocess.run(
@@ -172,7 +203,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"[ERROR] {e}")
 
-        # 6. nftables (puede interferir)
+        # 9. nftables (puede interferir)
         lines.append("\n--- nftables (puede interferir con iptables) ---")
         try:
             r = subprocess.run(
@@ -190,7 +221,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"  {e}")
 
-        # 7. IP Forward
+        # 10. IP Forward
         lines.append("\n--- IP Forward ---")
         try:
             r = subprocess.run(
@@ -201,7 +232,7 @@ class _DiagWorker(QThread):
         except Exception as e:
             lines.append(f"  {e}")
 
-        # 8. Conectividad a los sitios
+        # 11. Conectividad a los sitios
         lines.append("\n--- Conectividad TCP:443 desde Kali ---")
         for domain, key in [("facebook.com", "FB"), ("youtube.com", "YT"), ("hotmail.com", "Hotmail")]:
             try:
@@ -210,11 +241,21 @@ class _DiagWorker(QThread):
                 s.connect((domain, 443))
                 s.close()
                 lines.append(f"  {key} ({domain}): ACCESIBLE - el bloqueo en OUTPUT no esta activo")
-            except Exception:
-                lines.append(f"  {key} ({domain}): bloqueado o sin respuesta")
+            except Exception as e:
+                lines.append(f"  {key} ({domain}): BLOQUEADO / SIN RESPUESTA ({e})")
 
         lines.append("\n=== Fin del diagnostico ===")
         self.finished.emit("\n".join(lines))
+
+
+class _DeepResetWorker(QThread):
+    finished = Signal(bool, str)
+
+    def run(self):
+        from app.services import firewall_service
+        ok, msg = firewall_service.deep_reset_network()
+        self.finished.emit(ok, msg)
+
 
 
 # ─── STATUS BAR MEJORADA ─────────────────────────────────────────────────────
@@ -329,13 +370,14 @@ class _StatusBar(QFrame):
 # ─── PANEL DE DIAGNOSTICO ────────────────────────────────────────────────────
 
 class _DiagPanel(QFrame):
-    """Panel colapsable que muestra el estado real del sistema."""
+    """Panel colapsable que muestra el estado real del sistema y permite restablecer la red."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
         self._expanded = False
         self._worker = None
+        self._reset_worker = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -346,15 +388,21 @@ class _DiagPanel(QFrame):
         # Header del panel (siempre visible)
         header_row = QHBoxLayout()
 
-        title = QLabel("Diagnostico del sistema")
+        title = QLabel("Diagnostico y Resolucion")
         title.setObjectName("label_subtitle")
         header_row.addWidget(title)
 
         header_row.addStretch()
 
-        info = QLabel("Que hace falta para que el bloqueo funcione")
-        info.setObjectName("label_secondary")
-        header_row.addWidget(info)
+        self._btn_reset_net = QPushButton("Restablecer red y DNS")
+        self._btn_reset_net.setObjectName("btn_danger")
+        self._btn_reset_net.setToolTip(
+            "Vacía absolutamente todo (iptables, ip6tables, nftables, ipset) "
+            "y restablece servidores DNS públicos en resolv.conf para devolver "
+            "la conectividad si algo quedó bloqueado o corrupto."
+        )
+        self._btn_reset_net.clicked.connect(self._run_deep_reset)
+        header_row.addWidget(self._btn_reset_net)
 
         self._btn_run = QPushButton("Ejecutar diagnostico")
         self._btn_run.setObjectName("btn_secondary")
@@ -433,6 +481,41 @@ class _DiagPanel(QFrame):
         # Actualizar resumen de estado rapido
         self._update_summary(output)
 
+    def _run_deep_reset(self):
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.warning(
+            self, "Restablecer red y DNS",
+            "Esto eliminara todas las reglas de cortafuegos activas (iptables, ip6tables, nftables),\n"
+            "destruira todos los conjuntos ipset, quitara bloqueos de /etc/hosts y restablecera\n"
+            "el DNS a los servidores publicos (8.8.8.8).\n\n"
+            "Usa esto si perdiste conectividad a los sitios y deseas limpiar la red de tu PC.\n\n"
+            "¿Deseas continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._btn_reset_net.setEnabled(False)
+        self._btn_reset_net.setText("Restableciendo...")
+        self._text_area.setPlainText("Restableciendo red y DNS de manera profunda, por favor espera...")
+        if not self._expanded:
+            self._text_area.setVisible(True)
+            self._expanded = True
+            self._btn_toggle.setText("Ocultar")
+
+        self._reset_worker = _DeepResetWorker()
+        self._reset_worker.finished.connect(self._on_deep_reset_done)
+        self._reset_worker.start()
+
+    def _on_deep_reset_done(self, ok: bool, msg: str):
+        self._btn_reset_net.setEnabled(True)
+        self._btn_reset_net.setText("Restablecer red y DNS")
+        self._text_area.setPlainText(f"=== Resultado del restablecimiento profundo ===\n\n{msg}")
+        self._text_area.verticalScrollBar().setValue(0)
+        # Ejecutar diagnostico despues del reset
+        self._run_diag()
+
     def _update_summary(self, output: str):
         # ipset
         if "ipset NO esta instalado" in output:
@@ -471,6 +554,7 @@ class _DiagPanel(QFrame):
         lbl.setStyleSheet(
             f"color: {color}; font-size: 11px; font-weight: 600; background: transparent;"
         )
+
 
 
 # ─── SITE CARD ───────────────────────────────────────────────────────────────
