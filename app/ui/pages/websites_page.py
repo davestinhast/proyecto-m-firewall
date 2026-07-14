@@ -778,6 +778,18 @@ class WebsitesPage(QWidget):
         self._status_bar = _StatusBar(self._config)
         layout.addWidget(self._status_bar)
 
+        # Nota tecnica sobre cache DNS
+        self._cache_notice = QLabel(
+            "Nota: Si el bloqueo no se refleja de inmediato en tu navegador, cierra y vuelve a abrirlo "
+            "(o usa una ventana en modo Incognito) para forzar la limpieza de su cache DNS interna."
+        )
+        self._cache_notice.setStyleSheet(
+            "color: #8892a4; font-size: 11px; font-weight: 500; background: transparent; "
+            "padding: 2px 4px;"
+        )
+        self._cache_notice.setWordWrap(True)
+        layout.addWidget(self._cache_notice)
+
         # Panel de diagnostico
         self._diag_panel = _DiagPanel()
         layout.addWidget(self._diag_panel)

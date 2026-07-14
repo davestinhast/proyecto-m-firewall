@@ -185,32 +185,46 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             lines.append("")
             lines.append("# --- Reglas de Bloqueo DNS Agresivo (Filtro de Contenido) ---")
             
-            # Bloquear servidores DoH conocidos para forzar fallback a DNS estandar en puerto 53
+            # Bloquear servidores DoH conocidos por IP para forzar fallback a DNS estandar en puerto 53
             doh_ips = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"]
             for ip in doh_ips:
                 lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport 443 -j {IPTABLES_CHAIN_REJECT}")
             
-            # Palabras clave a bloquear en consultas DNS (unencrypted UDP/TCP 53)
-            keywords = ["facebook", "youtube", "hotmail", "outlook"]
+            # Palabras clave a bloquear en consultas/respuestas DNS (UDP/TCP 53)
+            # Agregamos DoH domains para cegar el DNS cifrado del navegador
+            keywords = ["facebook", "youtube", "hotmail", "outlook", "dns.google", "cloudflare-dns", "dns.quad9"]
             for kw in keywords:
-                # Bloquear en consultas UDP 53
+                # Bloquear consultas (dport 53) y respuestas (sport 53) en UDP
                 lines.append(
                     f"-A {CHAIN_WEBBLOCK} -p udp --dport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
-                # Bloquear en consultas TCP 53
+                lines.append(
+                    f"-A {CHAIN_WEBBLOCK} -p udp --sport 53 "
+                    f"-m string --string \"{kw}\" --algo bm "
+                    f"-j {IPTABLES_CHAIN_REJECT}"
+                )
+                # Bloquear en TCP
                 lines.append(
                     f"-A {CHAIN_WEBBLOCK} -p tcp --dport 53 "
                     f"-m string --string \"{kw}\" --algo bm "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
+                lines.append(
+                    f"-A {CHAIN_WEBBLOCK} -p tcp --sport 53 "
+                    f"-m string --string \"{kw}\" --algo bm "
+                    f"-j {IPTABLES_CHAIN_REJECT}"
+                )
         lines.append("")
 
-    # === Saltos desde FORWARD y OUTPUT hacia las cadenas personalizadas ===
+    # === Saltos desde INPUT, FORWARD y OUTPUT hacia las cadenas personalizadas ===
     iface_in = f"-i {lan} " if lan else ""
 
     lines += [
+        "# --- Saltos INPUT → cadenas personalizadas (tráfico directo a Kali) ---",
+        f"-A INPUT -j {CHAIN_WEBBLOCK}",
+        "",
         "# --- Saltos FORWARD → cadenas personalizadas (tráfico de clientes) ---",
         f"-A FORWARD {iface_in}-j {CHAIN_MACBLOCK}",
         f"-A FORWARD {iface_in}-j {CHAIN_CONNLIMIT}",
