@@ -228,30 +228,18 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        self._progress_bar.setVisible(True)
-        self._progress_bar.setValue(0)
-        self._btn_apply.setEnabled(False)
-        self._status_label.setText("Iniciando...")
+        from app.ui.dialogs.progress_dialog import ApplyProgressDialog
+        dialog = ApplyProgressDialog(self._config, self)
+        # Mostrar de forma modal e iniciar la ejecución secuencial en segundo plano
+        dialog.start_execution()
+        dialog.exec()
 
-        self._apply_worker = ApplyWorker(self._config)
-        self._apply_worker.progress.connect(self._on_progress)
-        self._apply_worker.finished.connect(self._on_apply_finished)
-        self._apply_worker.start()
-
-    def _on_progress(self, pct: int, msg: str):
-        self._progress_bar.setValue(pct)
-        self._status_label.setText(msg)
-
-    def _on_apply_finished(self, ok: bool, msg: str):
-        self._progress_bar.setVisible(False)
-        self._btn_apply.setEnabled(self._mode == "admin")
-        self._status_label.setText(msg)
-        if ok:
-            self._pending_changes = False
-            self._btn_apply.setText("Activar Cortafuegos")
-            QMessageBox.information(self, "Cortafuegos Activo", "¡El cortafuegos se ha activado y configurado correctamente!")
-        else:
-            QMessageBox.warning(self, "Error al activar", msg)
+        # Al cerrarse el diálogo, refrescamos el estado de las pestañas
+        self._pending_changes = False
+        self._btn_apply.setText("Activar Cortafuegos")
+        for page in self._pages.values():
+            if hasattr(page, "_verify_all"):
+                page._verify_all()
 
     def _reset_iptables(self):
         reply = QMessageBox.warning(
