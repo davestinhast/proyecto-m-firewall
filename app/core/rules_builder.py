@@ -77,7 +77,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
 
     # === Cadena PM_REJECT: LOG + DROP ===
     lines += [
-        f"# --- Cadena {IPTABLES_CHAIN_REJECT}: registra y rechaza ---",
+        f"# [Cadena {IPTABLES_CHAIN_REJECT}: registra y rechaza]",
         f"-A {IPTABLES_CHAIN_REJECT} -m limit --limit {IPTABLES_LOG_LIMIT} --limit-burst 10 "
         f"-j LOG --log-prefix \"{IPTABLES_LOG_PREFIX}\" --log-level {IPTABLES_LOG_LEVEL}",
         f"-A {IPTABLES_CHAIN_REJECT} -j {config.get('default_action', 'DROP')}",
@@ -87,7 +87,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     # === Bloqueo MAC ===
     mac_rules = config.get("mac_rules", [])
     if mac_rules:
-        lines.append(f"# --- Cadena {CHAIN_MACBLOCK}: bloqueo por MAC ---")
+        lines.append(f"# [Cadena {CHAIN_MACBLOCK}: bloqueo por MAC]")
         for rule in mac_rules:
             if not rule.get("enabled", False):
                 continue
@@ -107,7 +107,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     # === connlimit: límite de conexiones simultáneas ===
     conn_profiles = config.get("conn_profiles", [])
     if conn_profiles:
-        lines.append(f"# --- Cadena {CHAIN_CONNLIMIT}: límite de conexiones simultáneas ---")
+        lines.append(f"# [Cadena {CHAIN_CONNLIMIT}: límite de conexiones simultáneas]")
         for p in conn_profiles:
             if not p.get("enabled", False):
                 continue
@@ -137,7 +137,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         action = clisrv.get("action", "DROP")
         protocols = clisrv.get("protocols", ["tcp", "udp", "icmp"])
         if srv and cli:
-            lines.append(f"# --- Cadena {CHAIN_CLISRV}: bloqueo cliente→servidor (servidor sí puede enviar a cliente) ---")
+            lines.append(f"# [Cadena {CHAIN_CLISRV}: bloqueo cliente-servidor]")
             iface_flag = f"-i {iface} " if iface else ""
             # Permitir respuestas ESTABLISHED del servidor hacia el cliente
             lines.append(
@@ -152,13 +152,13 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
                 )
             lines.append("")
 
-    # === Bloqueo sitios web — usa ipset sets, NO IPs hardcodeadas ===
+    # === Bloqueo sitios web ===
     blocked_domains = config.get("blocked_domains", {})
     has_webblock = any(v.get("enabled", False) for v in blocked_domains.values())
     if has_webblock:
-        lines.append(f"# --- Cadena {CHAIN_WEBBLOCK}: bloqueo por ipset (IPs actualizables) ---")
-        lines.append(f"# Los sets PM_FACEBOOK, PM_YOUTUBE, PM_HOTMAIL se cargan con:")
-        lines.append(f"# ipset restore < /opt/proyecto-m/rules/project_m.ipset")
+        lines.append(f"# [Cadena {CHAIN_WEBBLOCK}: bloqueo por ipset]")
+        lines.append("# Los sets PM_FACEBOOK, PM_YOUTUBE, PM_HOTMAIL se cargan con:")
+        lines.append("# ipset restore < /opt/proyecto-m/rules/project_m.ipset")
         lines.append("")
         for key, domain_cfg in blocked_domains.items():
             if not domain_cfg.get("enabled", False):
@@ -166,7 +166,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             label = domain_cfg.get("label", key)
             set_name = f"{IPSET_SET_PREFIX}{key.upper()}"
             ip_count = len(resolved_ips.get(key, []))
-            lines.append(f"# {label} — set: {set_name} ({ip_count} IPs cargadas)")
+            lines.append(f"# {label}: set {set_name} ({ip_count} IPs cargadas)")
             for port in WEB_BLOCK_PORTS:
                 # Bloquear TCP
                 lines.append(
@@ -185,8 +185,9 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         # Así el usuario no tiene que activar casillas avanzadas complejas.
         keywords = []
         if has_webblock:
-            # Siempre bloquear servidores DNS seguros (DoH) para forzar fallback a DNS estándar (puerto 53)
-            keywords += ["dns.google", "cloudflare-dns", "dns.quad9"]
+            # Siempre bloquear servidores DNS seguros (DoH) y el dominio canario de Firefox (use-application-dns.net)
+            # para forzar fallback a DNS estándar (puerto 53)
+            keywords += ["dns.google", "cloudflare-dns", "dns.quad9", "use-application-dns.net"]
             
             # Agregar palabras clave según el sitio activado
             for key, domain_cfg in blocked_domains.items():
@@ -194,51 +195,60 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
                     if key == "facebook":
                         keywords += ["facebook", "fbcdn"]
                     elif key == "youtube":
-                        keywords += ["youtube", "googlevideo", "youtu.be", "ytimg"]
+                        # Usamos "youtu" para abarcar youtube.com y youtu.be de un solo golpe
+                        keywords += ["youtu", "googlevideo", "ytimg"]
                     elif key == "hotmail":
                         keywords += ["hotmail", "outlook", "live.com"]
 
         if keywords:
             lines.append("")
-            lines.append("# --- Reglas de Bloqueo DNS Agresivo (Filtro de Contenido) ---")
+            lines.append("# [Reglas de Bloqueo DNS Agresivo (Filtro de Contenido)]")
             
             # Bloquear servidores DoH conocidos por IP para forzar fallback a DNS estándar en puerto 53
+            # Bloqueamos IPs principales de Google, Cloudflare y Quad9 en el puerto 443 de salida
             doh_ips = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"]
             for ip in doh_ips:
                 lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport 443 -j {IPTABLES_CHAIN_REJECT}")
+            
+            # BLOQUEO DE QUIC (UDP 443): Obliga al navegador a usar TCP 443 (donde las reglas de IP actúan sí o sí)
+            # Esto evita que YouTube se salte las reglas usando protocolos UDP rápidos de Google
+            lines.append("# Bloqueo global de QUIC para forzar fallback a TCP")
+            lines.append(f"-A {CHAIN_WEBBLOCK} -p udp --dport 443 -j {IPTABLES_CHAIN_REJECT}")
             
             # Eliminar duplicados
             keywords = list(set(keywords))
             for kw in keywords:
                 # Bloquear consultas (dport 53) y respuestas (sport 53) en UDP en la cadena PM_DNSBLOCK
-                lines.append(
-                    f"-A PM_DNSBLOCK -p udp --dport 53 "
-                    f"-m string --string \"{kw}\" --algo bm "
-                    f"-j {IPTABLES_CHAIN_REJECT}"
-                )
-                lines.append(
-                    f"-A PM_DNSBLOCK -p udp --sport 53 "
-                    f"-m string --string \"{kw}\" --algo bm "
-                    f"-j {IPTABLES_CHAIN_REJECT}"
-                )
-                # Bloquear en TCP
-                lines.append(
-                    f"-A PM_DNSBLOCK -p tcp --dport 53 "
-                    f"-m string --string \"{kw}\" --algo bm "
-                    f"-j {IPTABLES_CHAIN_REJECT}"
-                )
-                lines.append(
-                    f"-A PM_DNSBLOCK -p tcp --sport 53 "
-                    f"-m string --string \"{kw}\" --algo bm "
-                    f"-j {IPTABLES_CHAIN_REJECT}"
-                )
+                # Duplicamos con algoritmo BM y KMP por compatibilidad según el kernel de Linux
+                for algo in ["bm", "kmp"]:
+                    lines.append(
+                        f"-A PM_DNSBLOCK -p udp --dport 53 "
+                        f"-m string --string \"{kw}\" --algo {algo} "
+                        f"-j {IPTABLES_CHAIN_REJECT}"
+                    )
+                    lines.append(
+                        f"-A PM_DNSBLOCK -p udp --sport 53 "
+                        f"-m string --string \"{kw}\" --algo {algo} "
+                        f"-j {IPTABLES_CHAIN_REJECT}"
+                    )
+                    # Bloquear en TCP
+                    lines.append(
+                        f"-A PM_DNSBLOCK -p tcp --dport 53 "
+                        f"-m string --string \"{kw}\" --algo {algo} "
+                        f"-j {IPTABLES_CHAIN_REJECT}"
+                    )
+                    lines.append(
+                        f"-A PM_DNSBLOCK -p tcp --sport 53 "
+                        f"-m string --string \"{kw}\" --algo {algo} "
+                        f"-j {IPTABLES_CHAIN_REJECT}"
+                    )
         lines.append("")
 
     # === Saltos desde INPUT, FORWARD y OUTPUT hacia las cadenas personalizadas ===
     iface_in = f"-i {lan} " if lan else ""
 
     lines += [
-        "# --- Saltos INPUT → cadenas personalizadas ---",
+        "# [Saltos INPUT a cadenas personalizadas]",
         f"-A INPUT -j {CHAIN_WEBBLOCK}",
     ]
 
@@ -250,7 +260,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
 
     lines += [
         "",
-        "# --- Saltos FORWARD → cadenas personalizadas (tráfico de clientes) ---",
+        "# [Saltos FORWARD a cadenas personalizadas]",
         f"-A FORWARD {iface_in}-j {CHAIN_MACBLOCK}",
         f"-A FORWARD {iface_in}-j {CHAIN_CONNLIMIT}",
         f"-A FORWARD {iface_in}-j {CHAIN_CLISRV}",
@@ -265,7 +275,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
 
     lines += [
         "",
-        "# --- Saltos OUTPUT → PM_WEBBLOCK (bloqueo también desde la propia máquina Kali) ---",
+        "# [Saltos OUTPUT a PM_WEBBLOCK para bloqueo local]",
         f"-A OUTPUT -j {CHAIN_WEBBLOCK}",
     ]
 

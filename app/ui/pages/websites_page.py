@@ -95,10 +95,10 @@ class _DiagWorker(QThread):
     def run(self):
         lines = []
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        lines.append(f"=== Diagnostico M-FIREWALL [{ts}] ===\n")
+        lines.append(f"[Diagnóstico M-FIREWALL — {ts}]\n")
 
         # 1. Resolucion DNS general
-        lines.append("--- Resolucion DNS general ---")
+        lines.append("[Resolución DNS general]")
         try:
             ip = socket.gethostbyname("google.com")
             lines.append(f"  google.com se resuelve a: {ip} (DNS funciona)")
@@ -106,7 +106,7 @@ class _DiagWorker(QThread):
             lines.append(f"  [ERROR] No se pudo resolver google.com: {e}")
 
         # 2. Contenido de /etc/resolv.conf
-        lines.append("\n--- Contenido de /etc/resolv.conf (Servidores DNS) ---")
+        lines.append("\n[Servidores DNS en /etc/resolv.conf]")
         from pathlib import Path
         resolv = Path("/etc/resolv.conf")
         if resolv.exists():
@@ -118,7 +118,7 @@ class _DiagWorker(QThread):
             lines.append("  /etc/resolv.conf no existe.")
 
         # 3. Contenido de /etc/hosts
-        lines.append("\n--- Contenido de /etc/hosts ---")
+        lines.append("\n[Registros en /etc/hosts]")
         hosts = Path("/etc/hosts")
         if hosts.exists():
             try:
@@ -129,7 +129,7 @@ class _DiagWorker(QThread):
             lines.append("  /etc/hosts no existe.")
 
         # 4. ipset instalado?
-        lines.append("\n--- ipset ---")
+        lines.append("\n[Estado de ipset]")
         try:
             r = subprocess.run(["ipset", "version"], capture_output=True, text=True, timeout=5)
             lines.append(r.stdout.strip() or "ipset disponible")
@@ -139,7 +139,7 @@ class _DiagWorker(QThread):
             lines.append(f"[ERROR] {e}")
 
         # 5. Sets de ipset activos
-        lines.append("\n--- Sets ipset activos (PM_*) ---")
+        lines.append("\n[Sets de ipset activos (PM_*)]")
         for key in ["FACEBOOK", "YOUTUBE", "HOTMAIL"]:
             set_name = f"PM_{key}"
             try:
@@ -159,7 +159,7 @@ class _DiagWorker(QThread):
                 lines.append(f"  {set_name}: {e}")
 
         # 6. iptables chains PM_*
-        lines.append("\n--- iptables chain PM_WEBBLOCK ---")
+        lines.append("\n[Cadena iptables PM_WEBBLOCK]")
         try:
             r = subprocess.run(
                 ["iptables", "-L", "PM_WEBBLOCK", "-n", "-v"],
@@ -175,7 +175,7 @@ class _DiagWorker(QThread):
             lines.append(f"[ERROR] {e}")
 
         # 7. iptables OUTPUT hacia PM_WEBBLOCK
-        lines.append("\n--- iptables OUTPUT (bloqueo desde Kali) ---")
+        lines.append("\n[Bloqueo local de Kali (OUTPUT)]")
         try:
             r = subprocess.run(
                 ["iptables", "-L", "OUTPUT", "-n", "-v"],
@@ -190,7 +190,7 @@ class _DiagWorker(QThread):
             lines.append(f"[ERROR] {e}")
 
         # 8. iptables FORWARD
-        lines.append("\n--- iptables FORWARD (bloqueo para clientes) ---")
+        lines.append("\n[Bloqueo para clientes (FORWARD)]")
         try:
             r = subprocess.run(
                 ["iptables", "-L", "FORWARD", "-n", "-v"],
@@ -205,7 +205,7 @@ class _DiagWorker(QThread):
             lines.append(f"[ERROR] {e}")
 
         # 9. nftables (puede interferir)
-        lines.append("\n--- nftables (puede interferir con iptables) ---")
+        lines.append("\n[Estado de nftables]")
         try:
             r = subprocess.run(
                 ["nft", "list", "ruleset"],
@@ -223,7 +223,7 @@ class _DiagWorker(QThread):
             lines.append(f"  {e}")
 
         # 10. IP Forward
-        lines.append("\n--- IP Forward ---")
+        lines.append("\n[Estado de IP Forward]")
         try:
             r = subprocess.run(
                 ["sysctl", "net.ipv4.ip_forward"],
@@ -234,7 +234,7 @@ class _DiagWorker(QThread):
             lines.append(f"  {e}")
 
         # 11. Conectividad a los sitios
-        lines.append("\n--- Conectividad TCP:443 desde Kali ---")
+        lines.append("\n[Conectividad a puerto 443 desde Kali]")
         for domain, key in [("facebook.com", "FB"), ("youtube.com", "YT"), ("hotmail.com", "Hotmail")]:
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

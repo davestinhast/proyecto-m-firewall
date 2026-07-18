@@ -71,7 +71,7 @@ class CliSrvPage(QWidget):
             "background-color: #14532d; color: #22c55e; font-weight: bold; "
             "border-radius: 4px; padding: 4px 8px; font-size: 11px;"
         )
-        self._lbl_flow_ok = QLabel("Servidor Kali  --->  Dispositivo Cliente  (El servidor puede iniciar conexiones)")
+        self._lbl_flow_ok = QLabel("Servidor Kali  →  Dispositivo Cliente  (El servidor puede iniciar conexiones)")
         self._lbl_flow_ok.setStyleSheet("font-size: 12px; color: #e8eaf0; background: transparent;")
         row_ok.addWidget(lbl_ok_badge)
         row_ok.addWidget(self._lbl_flow_ok, stretch=1)
@@ -85,7 +85,7 @@ class CliSrvPage(QWidget):
             "background-color: #7f1d1d; color: #f87171; font-weight: bold; "
             "border-radius: 4px; padding: 4px 8px; font-size: 11px;"
         )
-        self._lbl_flow_no = QLabel("Dispositivo Cliente  -x->  Servidor Kali  (El cliente NO puede iniciar conexiones nuevas)")
+        self._lbl_flow_no = QLabel("Dispositivo Cliente  ↛  Servidor Kali  (El cliente NO puede iniciar conexiones nuevas)")
         self._lbl_flow_no.setStyleSheet("font-size: 12px; color: #e8eaf0; background: transparent;")
         row_no.addWidget(lbl_no_badge)
         row_no.addWidget(self._lbl_flow_no, stretch=1)
@@ -234,11 +234,11 @@ class CliSrvPage(QWidget):
         srv = self._srv_ip_input.text().strip() or "Servidor"
         cli = self._cli_ip_input.text().strip() or "Cliente"
         if enabled:
-            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (El servidor si puede iniciar conexiones)")
-            self._lbl_flow_no.setText(f"{cli}  -x->  {srv}  (El cliente tiene prohibido conectarse al servidor)")
+            self._lbl_flow_ok.setText(f"{srv}  →  {cli}  (El servidor si puede iniciar conexiones)")
+            self._lbl_flow_no.setText(f"{cli}  ↛  {srv}  (El cliente tiene prohibido conectarse al servidor)")
         else:
-            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (Sin restricciones - Regla inactiva)")
-            self._lbl_flow_no.setText(f"{cli}  --->  {srv}  (Sin restricciones - Regla inactiva)")
+            self._lbl_flow_ok.setText(f"{srv}  →  {cli}  (Sin restricciones - Regla inactiva)")
+            self._lbl_flow_no.setText(f"{cli}  →  {srv}  (Sin restricciones - Regla inactiva)")
 
     def _auto_detect_srv(self):
         ip, iface = network_service.get_own_ip_and_interface()
