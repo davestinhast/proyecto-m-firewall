@@ -67,9 +67,46 @@ class DNSProxyServer:
             except Exception:
                 break
 
+    def _decode_dns_name(self, data: bytes, offset: int = 12) -> str:
+        """Extrae el nombre de dominio codificado de un paquete DNS."""
+        try:
+            labels = []
+            while offset < len(data):
+                length = data[offset]
+                if length == 0:
+                    break
+                # Si es un puntero comprimido (0xc0)
+                if (length & 0xc0) == 0xc0:
+                    break
+                offset += 1
+                label = data[offset:offset+length].decode("utf-8", errors="ignore")
+                labels.append(label)
+                offset += length
+            return ".".join(labels)
+        except Exception:
+            return "desconocido"
+
+    def _write_to_rejected_log(self, client_ip: str, domain: str, action: str):
+        """Escribe una línea de log personalizada en el archivo oficial de logs."""
+        from datetime import datetime
+        import os
+        from app.constants import LINUX_LOG_FILE
+        ts = datetime.now().strftime("%b %d %H:%M:%S")
+        # El formato contiene PM-DROP para que la interfaz lo filtre automáticamente
+        log_line = f"{ts} kali PM-DROP: [DNS-PROXY] SRC={client_ip} DOMAIN={domain} ACTION={action}\n"
+        try:
+            os.makedirs(os.path.dirname(LINUX_LOG_FILE), exist_ok=True)
+            with open(LINUX_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_line)
+        except Exception:
+            pass
+
     def _handle_query(self, data, addr):
         if len(data) < 12:
             return
+
+        client_ip = addr[0]
+        domain = self._decode_dns_name(data)
 
         # Palabras clave a bloquear basadas en la configuración cargada
         blocked_domains = self.config.get("blocked_domains", {})
@@ -112,7 +149,8 @@ class DNSProxyServer:
             response = tx_id + b"\x81\x83" + qd_count + b"\x00\x00\x00\x00\x00\x00" + data[12:]
             try:
                 self.sock.sendto(response, addr)
-                logger.info(f"DNS Proxy: Interceptado y bloqueado dominio (NXDOMAIN) para {addr}")
+                logger.info(f"DNS Proxy: Interceptado y bloqueado {domain} para {client_ip}")
+                self._write_to_rejected_log(client_ip, domain, "BLOQUEADO (NXDOMAIN)")
             except Exception:
                 pass
         else:
