@@ -181,19 +181,34 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
 
-        # Si el bloqueo DNS agresivo esta activado, inyectamos las reglas de filtrado por contenido DNS
-        if config.get("aggressive_dns", False):
+        # El bloqueo DNS inteligente se activa de forma AUTOMÁTICA para cualquier dominio que esté habilitado.
+        # Así el usuario no tiene que activar casillas avanzadas complejas.
+        keywords = []
+        if has_webblock:
+            # Siempre bloquear servidores DNS seguros (DoH) para forzar fallback a DNS estándar (puerto 53)
+            keywords += ["dns.google", "cloudflare-dns", "dns.quad9"]
+            
+            # Agregar palabras clave según el sitio activado
+            for key, domain_cfg in blocked_domains.items():
+                if domain_cfg.get("enabled", False):
+                    if key == "facebook":
+                        keywords += ["facebook", "fbcdn"]
+                    elif key == "youtube":
+                        keywords += ["youtube", "googlevideo", "youtu.be", "ytimg"]
+                    elif key == "hotmail":
+                        keywords += ["hotmail", "outlook", "live.com"]
+
+        if keywords:
             lines.append("")
             lines.append("# --- Reglas de Bloqueo DNS Agresivo (Filtro de Contenido) ---")
             
-            # Bloquear servidores DoH conocidos por IP para forzar fallback a DNS estandar en puerto 53
+            # Bloquear servidores DoH conocidos por IP para forzar fallback a DNS estándar en puerto 53
             doh_ips = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"]
             for ip in doh_ips:
                 lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport 443 -j {IPTABLES_CHAIN_REJECT}")
             
-            # Palabras clave a bloquear en consultas/respuestas DNS (UDP/TCP 53)
-            # Agregamos DoH domains para cegar el DNS cifrado del navegador
-            keywords = ["facebook", "youtube", "hotmail", "outlook", "dns.google", "cloudflare-dns", "dns.quad9"]
+            # Eliminar duplicados
+            keywords = list(set(keywords))
             for kw in keywords:
                 # Bloquear consultas (dport 53) y respuestas (sport 53) en UDP en la cadena PM_DNSBLOCK
                 lines.append(
@@ -227,7 +242,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         f"-A INPUT -j {CHAIN_WEBBLOCK}",
     ]
 
-    if config.get("aggressive_dns", False):
+    if keywords:
         lines += [
             f"-A INPUT -p udp --dport 53 -j PM_DNSBLOCK",
             f"-A INPUT -p tcp --dport 53 -j PM_DNSBLOCK",
@@ -242,7 +257,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         f"-A FORWARD {iface_in}-j {CHAIN_WEBBLOCK}",
     ]
 
-    if config.get("aggressive_dns", False):
+    if keywords:
         lines += [
             f"-A FORWARD -p udp --dport 53 -j PM_DNSBLOCK",
             f"-A FORWARD -p tcp --dport 53 -j PM_DNSBLOCK",
@@ -254,7 +269,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         f"-A OUTPUT -j {CHAIN_WEBBLOCK}",
     ]
 
-    if config.get("aggressive_dns", False):
+    if keywords:
         # En OUTPUT excluimos al usuario root (UID 0) para que la propia app pueda resolver
         lines += [
             f"-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK",

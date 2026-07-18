@@ -790,18 +790,6 @@ class WebsitesPage(QWidget):
         self._refresh_status.setVisible(False)
         layout.addWidget(self._refresh_status)
 
-        # Opciones avanzadas de bloqueo
-        options_card = QFrame()
-        options_card.setObjectName("card")
-        options_layout = QHBoxLayout(options_card)
-        options_layout.setContentsMargins(16, 12, 16, 12)
-        self._chk_aggressive_dns = QCheckBox("Habilitar bloqueo DNS avanzado (Recomendado para bloquear YouTube y celulares)")
-        self._chk_aggressive_dns.setStyleSheet("font-weight: 600; color: #c0c8d8; background: transparent;")
-        self._chk_aggressive_dns.toggled.connect(self._on_aggressive_dns_toggled)
-        options_layout.addWidget(self._chk_aggressive_dns)
-        options_layout.addStretch()
-        layout.addWidget(options_card)
-
         # Site cards
         blocked = self._config.get("blocked_domains", BLOCKED_DOMAINS)
         self._site_cards: dict = {}
@@ -912,16 +900,8 @@ class WebsitesPage(QWidget):
     def update_config(self, config: dict):
         self._config = config
         self._status_bar.update_config(config)
-        
-        self._chk_aggressive_dns.blockSignals(True)
-        self._chk_aggressive_dns.setChecked(config.get("aggressive_dns", False))
-        self._chk_aggressive_dns.blockSignals(False)
 
         blocked = config.get("blocked_domains", {})
         for key, card in self._site_cards.items():
             if key in blocked:
                 card.set_enabled(blocked[key].get("enabled", False))
-
-    def _on_aggressive_dns_toggled(self, checked: bool):
-        self._config["aggressive_dns"] = checked
-        self.config_changed.emit(self._config)
