@@ -74,23 +74,65 @@ def resolve_all_domains(blocked_domains: dict, progress_cb: Optional[Callable] =
         ]
     }
 
+def _log_to_official_file(text: str):
+    """Escribe logs de diagnóstico visibles en la pestaña de Registros."""
+    from datetime import datetime
+    import os
+    from app.constants import LINUX_LOG_FILE
+    ts = datetime.now().strftime("%b %d %H:%M:%S")
+    log_line = f"{ts} kali PM-DROP: [DIAGNOSTICO] {text}\n"
+    try:
+        os.makedirs(os.path.dirname(LINUX_LOG_FILE), exist_ok=True)
+        with open(LINUX_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line)
+    except Exception:
+        pass
+
+def resolve_all_domains(blocked_domains: dict, progress_cb: Optional[Callable] = None) -> dict[str, list[str]]:
+    """
+    Resuelve todos los dominios habilitados.
+    Retorna {"facebook": ["157.240.0.1", ...], ...}
+    """
+    # IPs de respaldo en caso de fallo en la resolucion DNS dinamica
+    fallback_ips = {
+        "facebook": [
+            "157.240.22.35", "157.240.2.35", "31.13.65.36", "31.13.71.36", 
+            "31.13.77.35", "157.240.1.35", "31.13.67.35", "157.240.18.35"
+        ],
+        "youtube": [
+            "142.250.78.142", "142.250.217.78", "172.217.171.206", "172.217.171.142",
+            "172.217.171.238", "142.250.200.78", "142.250.201.78", "142.250.190.14"
+        ],
+        "hotmail": [
+            "13.107.21.200", "13.107.246.40", "204.79.197.200", "40.97.120.42",
+            "40.97.148.226", "40.97.156.114", "52.96.165.18", "52.96.184.210"
+        ]
+    }
+
     result: dict[str, list[str]] = {}
     items = [(k, v) for k, v in blocked_domains.items() if v.get("enabled", False)]
     total = len(items)
 
+    _log_to_official_file(f"Iniciando resolucion DNS para {total} sitios habilitados...")
+
     for idx, (key, cfg) in enumerate(items):
         domains = cfg.get("domains", [])
         ips: set[str] = set()
+        _log_to_official_file(f"Resolviendo {len(domains)} dominios para '{key}'...")
         for domain in domains:
             found = resolve_domain(domain)
             ips.update(found)
         
-        # Si la resolucion dinamica fallo por completo, usar IPs de respaldo
-        resolved_list = sorted(ips)
-        if not resolved_list and key in fallback_ips:
-            resolved_list = fallback_ips[key]
+        # Filtrar solo IPs IPv4 válidas antes de chequear si está vacío
+        valid_resolved = [ip for ip in ips if _is_valid_ipv4(ip)]
+        _log_to_official_file(f"Dinamico '{key}': obtenidas {len(valid_resolved)} IPs IPv4 validas de {len(ips)} totales.")
+        
+        # Si la resolucion dinamica fallo por completo o solo dio IPs no validas, usar respaldo
+        if not valid_resolved and key in fallback_ips:
+            valid_resolved = fallback_ips[key]
+            _log_to_official_file(f"[!] Resolucion para '{key}' vacia o invalida. Cargadas {len(valid_resolved)} IPs de RESPALDO (Fallback).")
 
-        result[key] = resolved_list
+        result[key] = sorted(valid_resolved)
         if progress_cb:
             progress_cb(idx + 1, total, key, len(result[key]))
 
@@ -136,9 +178,11 @@ def apply_ipset(resolved: dict[str, list[str]]) -> tuple[bool, str]:
     Retorna (ok, mensaje).
     """
     if not resolved:
+        _log_to_official_file("apply_ipset: No hay sitios para cargar con ipset.")
         return True, "No hay sitios habilitados para bloquear con ipset."
 
     ipset_content = build_ipset_file(resolved)
+    _log_to_official_file(f"Ejecutando 'ipset restore' para cargar IPs de {[k for k in resolved.keys()]}...")
 
     try:
         result = subprocess.run(
