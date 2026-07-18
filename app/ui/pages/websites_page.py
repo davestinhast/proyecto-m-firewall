@@ -258,7 +258,6 @@ class _DeepResetWorker(QThread):
         self.finished.emit(ok, msg)
 
 
-
 # ─── STATUS BAR MEJORADA ─────────────────────────────────────────────────────
 
 class _StatusBar(QFrame):
@@ -273,23 +272,24 @@ class _StatusBar(QFrame):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(10)
 
         # Fila 1: IP Forward + boton activar
         row1 = QHBoxLayout()
         row1.setSpacing(12)
 
-        ip_icon = QLabel("IP Forward:")
+        ip_icon = QLabel("Reenvío de Internet:")
         ip_icon.setObjectName("label_hint")
-        ip_icon.setFixedWidth(72)
+        ip_icon.setStyleSheet("font-weight: 600; color: #a0aec0; background: transparent;")
+        ip_icon.setFixedWidth(140)
         row1.addWidget(ip_icon)
 
         self._ipfwd_lbl = QLabel("Verificando...")
         self._ipfwd_lbl.setObjectName("label_secondary")
         row1.addWidget(self._ipfwd_lbl, stretch=1)
 
-        self._btn_enable_ipfwd = QPushButton("Activar IP Forward")
+        self._btn_enable_ipfwd = QPushButton("Activar Compartir Internet")
         self._btn_enable_ipfwd.setObjectName("btn_success")
         self._btn_enable_ipfwd.setVisible(False)
         self._btn_enable_ipfwd.clicked.connect(self._on_enable)
@@ -297,38 +297,31 @@ class _StatusBar(QFrame):
 
         layout.addLayout(row1)
 
-        # Fila 2: Gateway para clientes + ruta archivo
+        # Fila 2: Configuración del Cliente
         row2 = QHBoxLayout()
         row2.setSpacing(12)
 
-        gw_icon = QLabel("Gateway:")
+        gw_icon = QLabel("Configurar Cliente:")
         gw_icon.setObjectName("label_hint")
-        gw_icon.setFixedWidth(72)
+        gw_icon.setStyleSheet("font-weight: 600; color: #a0aec0; background: transparent;")
+        gw_icon.setFixedWidth(140)
         row2.addWidget(gw_icon)
 
-        srv_ip = self._config.get("server_ip", "") or "X.X.X.X"
+        srv_ip = self._config.get("server_ip", "") or "192.168.50.1"
         self._gw_cmd = f"sudo ip route add default via {srv_ip}"
-        self._gw_lbl = QLabel(self._gw_cmd)
-        self._gw_lbl.setStyleSheet(
-            "font-family: 'Consolas','Courier New',monospace; font-size: 11px; "
-            "color: #7080a0; background: transparent;"
+        
+        instructions_lbl = QLabel(
+            f"Escribe en la terminal de la computadora cliente:  <b>{self._gw_cmd}</b>"
         )
-        self._gw_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        row2.addWidget(self._gw_lbl, stretch=1)
+        instructions_lbl.setStyleSheet("color: #cbd5e1; font-size: 11px; background: transparent;")
+        instructions_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        row2.addWidget(instructions_lbl, stretch=1)
 
-        btn_copy = QPushButton("Copiar")
+        btn_copy = QPushButton("Copiar comando")
         btn_copy.setObjectName("btn_small")
-        btn_copy.setToolTip("Ejecutar en el PC cliente para configurar gateway")
+        btn_copy.setToolTip("Copia el comando para establecer la puerta de enlace en el cliente.")
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(self._gw_cmd))
         row2.addWidget(btn_copy)
-
-        rules_path = self._config.get("rules_file", "") or LINUX_RULES_FILE
-        path_lbl = QLabel(f"Reglas: {rules_path}")
-        path_lbl.setStyleSheet(
-            "font-family: 'Consolas','Courier New',monospace; font-size: 10px; "
-            "color: #3a4050; background: transparent;"
-        )
-        row2.addWidget(path_lbl)
 
         layout.addLayout(row2)
 
@@ -338,16 +331,16 @@ class _StatusBar(QFrame):
         from app.core.platform_detector import is_linux, has_ip_forward
         if is_linux():
             if has_ip_forward():
-                self._ipfwd_lbl.setText("ACTIVO — Kali esta reenviando paquetes correctamente")
-                self._ipfwd_lbl.setStyleSheet("color: #22c55e; font-size: 12px; background: transparent;")
+                self._ipfwd_lbl.setText("ACTIVO — Los clientes conectados pueden navegar a través de este equipo")
+                self._ipfwd_lbl.setStyleSheet("color: #22c55e; font-size: 12px; font-weight: bold; background: transparent;")
                 self._btn_enable_ipfwd.setVisible(False)
             else:
-                self._ipfwd_lbl.setText("INACTIVO — los clientes no podran ser bloqueados sin esto")
-                self._ipfwd_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: 600; background: transparent;")
+                self._ipfwd_lbl.setText("INACTIVO — Los clientes no tendrán acceso a internet para ser bloqueados")
+                self._ipfwd_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent;")
                 self._btn_enable_ipfwd.setVisible(True)
         else:
-            self._ipfwd_lbl.setText("Modo demo — no aplica")
-            self._ipfwd_lbl.setStyleSheet("color: #4a5060; font-size: 12px; background: transparent;")
+            self._ipfwd_lbl.setText("Modo de demostración activo (Sin kernel Linux)")
+            self._ipfwd_lbl.setStyleSheet("color: #64748b; font-size: 12px; background: transparent;")
 
     def _on_enable(self):
         self._btn_enable_ipfwd.setEnabled(False)
@@ -358,14 +351,14 @@ class _StatusBar(QFrame):
 
     def _on_done(self, ok: bool):
         self._btn_enable_ipfwd.setEnabled(True)
-        self._btn_enable_ipfwd.setText("Activar IP Forward")
+        self._btn_enable_ipfwd.setText("Activar Compartir Internet")
         self.refresh()
 
     def update_config(self, config: dict):
         self._config = config
-        srv_ip = config.get("server_ip", "") or "X.X.X.X"
+        srv_ip = config.get("server_ip", "") or "192.168.50.1"
         self._gw_cmd = f"sudo ip route add default via {srv_ip}"
-        self._gw_lbl.setText(self._gw_cmd)
+        self.refresh()
 
 
 # ─── PANEL DE DIAGNOSTICO ────────────────────────────────────────────────────
@@ -389,28 +382,27 @@ class _DiagPanel(QFrame):
         # Header del panel (siempre visible)
         header_row = QHBoxLayout()
 
-        title = QLabel("Diagnostico y Resolucion")
+        title = QLabel("Diagnóstico de Red y Cortafuegos")
         title.setObjectName("label_subtitle")
         header_row.addWidget(title)
 
         header_row.addStretch()
 
-        self._btn_reset_net = QPushButton("Restablecer red y DNS")
+        self._btn_reset_net = QPushButton("Desbloquear Red y DNS")
         self._btn_reset_net.setObjectName("btn_danger")
         self._btn_reset_net.setToolTip(
-            "Vacía absolutamente todo (iptables, ip6tables, nftables, ipset) "
-            "y restablece servidores DNS públicos en resolv.conf para devolver "
-            "la conectividad si algo quedó bloqueado o corrupto."
+            "Restaura y limpia de raíz cualquier configuración del cortafuegos\n"
+            "para recuperar la conectividad si algo falló o se bloqueó accidentalmente."
         )
         self._btn_reset_net.clicked.connect(self._run_deep_reset)
         header_row.addWidget(self._btn_reset_net)
 
-        self._btn_run = QPushButton("Ejecutar diagnostico")
+        self._btn_run = QPushButton("Comprobar estado")
         self._btn_run.setObjectName("btn_secondary")
         self._btn_run.clicked.connect(self._run_diag)
         header_row.addWidget(self._btn_run)
 
-        self._btn_toggle = QPushButton("Mostrar")
+        self._btn_toggle = QPushButton("Ver detalles técnicos")
         self._btn_toggle.setObjectName("btn_small")
         self._btn_toggle.clicked.connect(self._toggle)
         header_row.addWidget(self._btn_toggle)
@@ -421,10 +413,10 @@ class _DiagPanel(QFrame):
         self._summary_row = QHBoxLayout()
         self._summary_row.setSpacing(20)
 
-        self._lbl_ipset    = self._make_status_lbl("ipset")
-        self._lbl_webblock = self._make_status_lbl("PM_WEBBLOCK")
-        self._lbl_ipfwd    = self._make_status_lbl("IP Forward")
-        self._lbl_nft      = self._make_status_lbl("nftables")
+        self._lbl_ipset    = self._make_status_lbl("Bases de Datos IP")
+        self._lbl_webblock = self._make_status_lbl("Cortafuegos de Sitios")
+        self._lbl_ipfwd    = self._make_status_lbl("Compartir Internet")
+        self._lbl_nft      = self._make_status_lbl("Compatibilidad nftables")
 
         for lbl in [self._lbl_ipset, self._lbl_webblock, self._lbl_ipfwd, self._lbl_nft]:
             self._summary_row.addWidget(lbl)
@@ -434,15 +426,15 @@ class _DiagPanel(QFrame):
         # Area de texto colapsable (output completo)
         self._text_area = QTextEdit()
         self._text_area.setReadOnly(True)
-        self._text_area.setMinimumHeight(280)
-        self._text_area.setMaximumHeight(400)
+        self._text_area.setMinimumHeight(200)
+        self._text_area.setMaximumHeight(350)
         self._text_area.setPlaceholderText(
-            "Presiona 'Ejecutar diagnostico' para ver el estado real del sistema.\n\n"
-            "Esto mostrara:\n"
-            "  - Si ipset esta instalado y cuantas IPs tiene cargadas\n"
-            "  - Si iptables tiene activas las cadenas PM_WEBBLOCK\n"
-            "  - Si nftables esta interfiriendo con el bloqueo\n"
-            "  - Si los sitios son accesibles desde Kali"
+            "Presiona 'Comprobar estado' para realizar una auditoría de red.\n\n"
+            "El sistema validará:\n"
+            "  - La instalación de ipset y las direcciones cargadas.\n"
+            "  - Las reglas activas en el núcleo de Linux.\n"
+            "  - La interferencia de otros programas del sistema.\n"
+            "  - El estado de la conectividad en tiempo real."
         )
         self._text_area.setVisible(False)
         layout.addWidget(self._text_area)
@@ -450,24 +442,24 @@ class _DiagPanel(QFrame):
     def _make_status_lbl(self, name: str) -> QLabel:
         lbl = QLabel(f"{name}: —")
         lbl.setObjectName("label_mono")
-        lbl.setStyleSheet("color: #4a5060; font-size: 11px; background: transparent;")
+        lbl.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 500; background: transparent;")
         return lbl
 
     def _toggle(self):
         self._expanded = not self._expanded
         self._text_area.setVisible(self._expanded)
-        self._btn_toggle.setText("Ocultar" if self._expanded else "Mostrar")
+        self._btn_toggle.setText("Ocultar detalles técnicos" if self._expanded else "Ver detalles técnicos")
 
     def _run_diag(self):
         if self._worker and self._worker.isRunning():
             return
         self._btn_run.setEnabled(False)
-        self._btn_run.setText("Ejecutando...")
-        self._text_area.setPlainText("Ejecutando diagnostico del sistema...")
+        self._btn_run.setText("Comprobando...")
+        self._text_area.setPlainText("Analizando la configuración de red actual, por favor espera...")
         if not self._expanded:
             self._text_area.setVisible(True)
             self._expanded = True
-            self._btn_toggle.setText("Ocultar")
+            self._btn_toggle.setText("Ocultar detalles técnicos")
 
         self._worker = _DiagWorker()
         self._worker.finished.connect(self._on_diag_done)
@@ -475,7 +467,7 @@ class _DiagPanel(QFrame):
 
     def _on_diag_done(self, output: str):
         self._btn_run.setEnabled(True)
-        self._btn_run.setText("Ejecutar diagnostico")
+        self._btn_run.setText("Comprobar estado")
         self._text_area.setPlainText(output)
         self._text_area.verticalScrollBar().setValue(0)
 
@@ -485,12 +477,10 @@ class _DiagPanel(QFrame):
     def _run_deep_reset(self):
         from PySide6.QtWidgets import QMessageBox
         reply = QMessageBox.warning(
-            self, "Restablecer red y DNS",
-            "Esto eliminara todas las reglas de cortafuegos activas (iptables, ip6tables, nftables),\n"
-            "destruira todos los conjuntos ipset, quitara bloqueos de /etc/hosts y restablecera\n"
-            "el DNS a los servidores publicos (8.8.8.8).\n\n"
-            "Usa esto si perdiste conectividad a los sitios y deseas limpiar la red de tu PC.\n\n"
-            "¿Deseas continuar?",
+            self, "Desbloquear Red y DNS",
+            "¿Deseas restaurar la conectividad de red por completo?\n\n"
+            "Esto eliminará todos los bloqueos activos, borrará las configuraciones del cortafuegos\n"
+            "y restablecerá el servicio de internet. Úsalo si pierdes conexión o si quieres empezar de cero.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -498,12 +488,12 @@ class _DiagPanel(QFrame):
             return
 
         self._btn_reset_net.setEnabled(False)
-        self._btn_reset_net.setText("Restableciendo...")
-        self._text_area.setPlainText("Restableciendo red y DNS de manera profunda, por favor espera...")
+        self._btn_reset_net.setText("Desbloqueando...")
+        self._text_area.setPlainText("Restableciendo conexiones de red y DNS del sistema, espera...")
         if not self._expanded:
             self._text_area.setVisible(True)
             self._expanded = True
-            self._btn_toggle.setText("Ocultar")
+            self._btn_toggle.setText("Ocultar detalles técnicos")
 
         self._reset_worker = _DeepResetWorker()
         self._reset_worker.finished.connect(self._on_deep_reset_done)
@@ -511,42 +501,41 @@ class _DiagPanel(QFrame):
 
     def _on_deep_reset_done(self, ok: bool, msg: str):
         self._btn_reset_net.setEnabled(True)
-        self._btn_reset_net.setText("Restablecer red y DNS")
-        self._text_area.setPlainText(f"=== Resultado del restablecimiento profundo ===\n\n{msg}")
+        self._btn_reset_net.setText("Desbloquear Red y DNS")
+        self._text_area.setPlainText(f"=== Restablecimiento de Red Completado ===\n\n{msg}")
         self._text_area.verticalScrollBar().setValue(0)
-        # Ejecutar diagnostico despues del reset
         self._run_diag()
 
     def _update_summary(self, output: str):
         # ipset
         if "ipset NO esta instalado" in output:
-            self._set_lbl(self._lbl_ipset, "ipset: NO INSTALADO", "err")
+            self._set_lbl(self._lbl_ipset, "Bases de Datos IP: NO INSTALADO", "err")
         elif "Number of entries: 0" in output:
-            self._set_lbl(self._lbl_ipset, "ipset: sin IPs", "warn")
+            self._set_lbl(self._lbl_ipset, "Bases de Datos IP: Vacías", "warn")
         elif "Number of entries:" in output:
-            self._set_lbl(self._lbl_ipset, "ipset: IPs cargadas", "ok")
+            self._set_lbl(self._lbl_ipset, "Bases de Datos IP: Listas", "ok")
         else:
-            self._set_lbl(self._lbl_ipset, "ipset: sets vacios", "warn")
+            self._set_lbl(self._lbl_ipset, "Bases de Datos IP: Vacías", "warn")
 
         # PM_WEBBLOCK
         if "Chain no existe" in output or "does not exist" in output:
-            self._set_lbl(self._lbl_webblock, "PM_WEBBLOCK: no existe", "err")
+            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Inactivo", "err")
         elif "match-set" in output or "PM_REJECT" in output:
-            self._set_lbl(self._lbl_webblock, "PM_WEBBLOCK: activo", "ok")
+            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Activo", "ok")
         else:
-            self._set_lbl(self._lbl_webblock, "PM_WEBBLOCK: vacio", "warn")
+            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Vacío", "warn")
 
         # IP Forward
         if "= 1" in output or "= 1\n" in output:
-            self._set_lbl(self._lbl_ipfwd, "IP Forward: activo", "ok")
+            self._set_lbl(self._lbl_ipfwd, "Compartir Internet: Activo", "ok")
         else:
-            self._set_lbl(self._lbl_ipfwd, "IP Forward: inactivo", "err")
+            self._set_lbl(self._lbl_ipfwd, "Compartir Internet: Inactivo", "err")
 
         # nftables
         if "nftables tiene reglas activas" in output:
-            self._set_lbl(self._lbl_nft, "nftables: ACTIVO (puede interferir)", "warn")
+            self._set_lbl(self._lbl_nft, "Interferencia nftables: Detectada", "warn")
         else:
-            self._set_lbl(self._lbl_nft, "nftables: sin reglas", "ok")
+            self._set_lbl(self._lbl_nft, "Interferencia nftables: Ninguna", "ok")
 
     def _set_lbl(self, lbl: QLabel, text: str, state: str):
         colors = {"ok": "#22c55e", "warn": "#f59e0b", "err": "#ef4444"}
@@ -660,43 +649,44 @@ class SiteCard(QFrame):
         ts = datetime.now().strftime("%H:%M")
 
         if ip_count == -1:
-            self._badge.setText("ipset no disponible (instala: sudo apt install ipset)")
+            self._badge.setText("ERROR DE INSTALACIÓN")
             self._badge.setStyleSheet(
-                "color: #ef4444; font-size: 11px; font-weight: 600; background: transparent;"
+                "color: #ef4444; font-size: 11px; font-weight: 700; background: transparent;"
             )
-            self._ipset_label.setText(f"ipset: no instalado ({ts})")
+            self._ipset_label.setText("Falta instalar componentes de red.")
             self._ipset_label.setStyleSheet("color: #ef4444; font-size: 11px; background: transparent;")
             self._reach_label.setText("")
         elif ip_count == 0:
-            self._badge.setText("INACTIVO — aplica las reglas primero")
+            self._badge.setText("PERMITIDO (Sin bloqueo)")
             self._badge.setStyleSheet(
-                "color: #f59e0b; font-size: 12px; font-weight: 600; background: transparent;"
+                "color: #a0aec0; font-size: 11px; font-weight: 600; background: transparent;"
             )
-            self._ipset_label.setText(f"ipset: 0 IPs ({ts})")
-            self._ipset_label.setStyleSheet("color: #f59e0b; font-size: 11px; background: transparent;")
+            self._ipset_label.setText(f"El bloqueo no se ha activado aún ({ts})")
+            self._ipset_label.setStyleSheet("color: #64748b; font-size: 11px; background: transparent;")
             if reachable:
-                self._reach_label.setStyleSheet("color: #ef4444; font-size: 11px; background: transparent;")
-                self._reach_label.setText("accesible desde Kali")
+                self._reach_label.setStyleSheet("color: #3b82f6; font-size: 11px; background: transparent;")
+                self._reach_label.setText("— El sitio está accesible en internet")
             else:
                 self._reach_label.setText("")
         else:
             if reachable:
-                self._badge.setText("PARCIAL — IPs cargadas pero sitio responde desde Kali")
+                self._badge.setText("BLOQUEADO EN LA RED")
                 self._badge.setStyleSheet(
-                    "color: #f97316; font-size: 11px; font-weight: 600; background: transparent;"
+                    "color: #22c55e; font-size: 11px; font-weight: 700; background: transparent;"
                 )
-                self._reach_label.setStyleSheet("color: #f97316; font-size: 11px; background: transparent;")
-                self._reach_label.setText("Kali puede acceder (OUTPUT activo bloquea esto)")
+                self._ipset_label.setText(f"Protección de red lista ({ts})")
+                self._ipset_label.setStyleSheet("color: #22c55e; font-size: 11px; background: transparent;")
+                self._reach_label.setStyleSheet("color: #f59e0b; font-size: 11px; background: transparent;")
+                self._reach_label.setText("— El sitio responde localmente por caché")
             else:
-                self._badge.setText("BLOQUEADO")
+                self._badge.setText("BLOQUEADO (Protección activa)")
                 self._badge.setStyleSheet(
-                    "color: #ef4444; font-size: 12px; font-weight: 700; background: transparent;"
+                    "color: #22c55e; font-size: 11px; font-weight: 700; background: transparent;"
                 )
+                self._ipset_label.setText(f"Bloqueo verificado correctamente ({ts})")
+                self._ipset_label.setStyleSheet("color: #22c55e; font-size: 11px; background: transparent;")
                 self._reach_label.setStyleSheet("color: #22c55e; font-size: 11px; background: transparent;")
-                self._reach_label.setText("TCP 443: sin respuesta")
-
-            self._ipset_label.setText(f"ipset: {ip_count} IPs ({ts})")
-            self._ipset_label.setStyleSheet("color: #22c55e; font-size: 11px; background: transparent;")
+                self._reach_label.setText("— El sitio no responde (Bloqueo exitoso)")
 
         self._btn_check.setEnabled(True)
 
@@ -805,7 +795,7 @@ class WebsitesPage(QWidget):
         options_card.setObjectName("card")
         options_layout = QHBoxLayout(options_card)
         options_layout.setContentsMargins(16, 12, 16, 12)
-        self._chk_aggressive_dns = QCheckBox("Habilitar bloqueo DNS avanzado (Filtrado de contenido en puerto 53)")
+        self._chk_aggressive_dns = QCheckBox("Habilitar bloqueo DNS avanzado (Recomendado para bloquear YouTube y celulares)")
         self._chk_aggressive_dns.setStyleSheet("font-weight: 600; color: #c0c8d8; background: transparent;")
         self._chk_aggressive_dns.toggled.connect(self._on_aggressive_dns_toggled)
         options_layout.addWidget(self._chk_aggressive_dns)

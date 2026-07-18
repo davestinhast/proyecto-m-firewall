@@ -104,7 +104,7 @@ class CliSrvPage(QWidget):
         config_layout.setContentsMargins(20, 16, 20, 20)
         config_layout.setSpacing(14)
 
-        config_title = QLabel("Configuracion")
+        config_title = QLabel("Configuración de Control Unidireccional")
         config_title.setObjectName("label_subtitle")
         config_layout.addWidget(config_title)
 
@@ -118,12 +118,12 @@ class CliSrvPage(QWidget):
         self._srv_ip_input.editingFinished.connect(self._on_save)
 
         self._cli_ip_input = QLineEdit()
-        self._cli_ip_input.setPlaceholderText("ej: 192.168.50.10  o  192.168.50.0/24")
+        self._cli_ip_input.setPlaceholderText("ej: 192.168.50.10 (IP del cliente)")
         self._cli_ip_input.setMinimumWidth(220)
         self._cli_ip_input.editingFinished.connect(self._on_save)
 
         self._iface_combo = QComboBox()
-        self._iface_combo.addItem("(cualquier interfaz)")
+        self._iface_combo.addItem("(cualquier conexión)")
         self._iface_combo.addItems(network_service.get_available_interfaces())
         self._iface_combo.setMinimumWidth(220)
         self._iface_combo.currentIndexChanged.connect(self._on_save)
@@ -134,9 +134,9 @@ class CliSrvPage(QWidget):
         proto_row = QHBoxLayout(proto_widget)
         proto_row.setContentsMargins(0, 0, 0, 0)
         proto_row.setSpacing(16)
-        self._proto_tcp  = QCheckBox("TCP")
-        self._proto_udp  = QCheckBox("UDP")
-        self._proto_icmp = QCheckBox("ICMP")
+        self._proto_tcp  = QCheckBox("Páginas y servicios (TCP)")
+        self._proto_udp  = QCheckBox("Streaming y DNS (UDP)")
+        self._proto_icmp = QCheckBox("Ping diagnóstico (ICMP)")
         self._proto_tcp.setChecked(True)
         for cb in [self._proto_tcp, self._proto_udp, self._proto_icmp]:
             cb.toggled.connect(self._on_save)
@@ -144,20 +144,21 @@ class CliSrvPage(QWidget):
         proto_row.addStretch()
 
         self._action_combo = QComboBox()
-        self._action_combo.addItems(["DROP", "REJECT"])
-        self._action_combo.setMinimumWidth(120)
+        self._action_combo.addItem("Bloqueo silencioso (DROP)", "DROP")
+        self._action_combo.addItem("Bloqueo con aviso (REJECT)", "REJECT")
+        self._action_combo.setMinimumWidth(220)
         self._action_combo.currentIndexChanged.connect(self._on_save)
 
-        form.addRow("IP del servidor Kali:", self._srv_ip_input)
-        form.addRow("IP o Red del cliente:", self._cli_ip_input)
-        form.addRow("Interfaz LAN:", self._iface_combo)
-        form.addRow("Protocolos a bloquear:", proto_widget)
-        form.addRow("Accion al bloquear:", self._action_combo)
+        form.addRow("IP del servidor (Este equipo):", self._srv_ip_input)
+        form.addRow("IP de la computadora cliente:", self._cli_ip_input)
+        form.addRow("Conexión de red de entrada (Interfaz LAN):", self._iface_combo)
+        form.addRow("Tráfico que deseas bloquear:", proto_widget)
+        form.addRow("Tipo de respuesta al bloquear:", self._action_combo)
         config_layout.addLayout(form)
 
         # Boton autodetectar IP del servidor
         btn_row = QHBoxLayout()
-        btn_detect = QPushButton("Detectar IP del servidor")
+        btn_detect = QPushButton("Detectar IP de mi servidor")
         btn_detect.setObjectName("btn_secondary")
         btn_detect.clicked.connect(self._auto_detect_srv)
         btn_row.addWidget(btn_detect)
@@ -216,7 +217,7 @@ class CliSrvPage(QWidget):
         self._proto_icmp.blockSignals(False)
 
         action = clisrv.get("action", "DROP")
-        idx = self._action_combo.findText(action)
+        idx = self._action_combo.findData(action)
         if idx >= 0:
             self._action_combo.setCurrentIndex(idx)
 
@@ -230,14 +231,14 @@ class CliSrvPage(QWidget):
 
     def _update_status(self):
         enabled = self._enabled_toggle.isChecked()
-        srv = self._srv_ip_input.text().strip() or "Servidor Kali"
-        cli = self._cli_ip_input.text().strip() or "Dispositivo Cliente"
+        srv = self._srv_ip_input.text().strip() or "Servidor"
+        cli = self._cli_ip_input.text().strip() or "Cliente"
         if enabled:
-            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (El servidor Kali si puede enviarle mensajes)")
-            self._lbl_flow_no.setText(f"{cli}  -x->  {srv}  (El cliente tiene prohibido iniciar mensajes nuevos)")
+            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (El servidor si puede iniciar conexiones)")
+            self._lbl_flow_no.setText(f"{cli}  -x->  {srv}  (El cliente tiene prohibido conectarse al servidor)")
         else:
-            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (Sin restricciones - Regla desactivada)")
-            self._lbl_flow_no.setText(f"{cli}  --->  {srv}  (Sin restricciones - Regla desactivada)")
+            self._lbl_flow_ok.setText(f"{srv}  --->  {cli}  (Sin restricciones - Regla inactiva)")
+            self._lbl_flow_no.setText(f"{cli}  --->  {srv}  (Sin restricciones - Regla inactiva)")
 
     def _auto_detect_srv(self):
         ip, iface = network_service.get_own_ip_and_interface()
@@ -254,14 +255,14 @@ class CliSrvPage(QWidget):
         if srv_text:
             ok, msg = validators.validate_ipv4(srv_text)
             if not ok:
-                self._error_label.setText(f"IP servidor: {msg}")
+                self._error_label.setText(f"IP de servidor incorrecta: {msg}")
                 return
         if cli_text:
             ok, msg = validators.validate_ipv4(cli_text)
             if not ok:
                 ok2, _ = validators.validate_cidr(cli_text)
                 if not ok2:
-                    self._error_label.setText(f"IP cliente: debe ser una IP o CIDR valido")
+                    self._error_label.setText(f"IP de cliente incorrecta: debe ser una dirección IP válida")
                     return
 
         self._error_label.setText("")
@@ -273,13 +274,15 @@ class CliSrvPage(QWidget):
             protocols = ["tcp"]
 
         iface = self._iface_combo.currentText()
+        action_data = self._action_combo.currentData() or "DROP"
+
         self._config["clisrv"] = {
             "enabled":    self._enabled_toggle.isChecked(),
             "server_ip":  srv_text,
             "client_ip":  cli_text,
             "interface":  "" if "(cualquier" in iface else iface,
             "protocols":  protocols,
-            "action":     self._action_combo.currentText(),
+            "action":     action_data,
         }
         self._update_status()
         self.config_changed.emit(self._config)

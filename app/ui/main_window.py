@@ -150,20 +150,21 @@ class MainWindow(QMainWindow):
         layout.addWidget(authors_lbl)
 
         # Botón limpiar iptables
-        btn_reset = QPushButton("Limpiar iptables")
-        btn_reset.setObjectName("btn_danger")
-        btn_reset.setToolTip("Elimina TODAS las reglas iptables activas del sistema.")
+        btn_reset = QPushButton("Apagar Cortafuegos")
+        btn_reset.setObjectName("btn_reset_firewall")
+        btn_reset.setStyleSheet("background-color: #3b111a; border-color: #551e24; color: #f87171;")
+        btn_reset.setToolTip("Desactiva temporalmente el cortafuegos y vuelve a permitir todo el tráfico.")
         btn_reset.clicked.connect(self._reset_iptables)
         if self._mode == "demo":
             btn_reset.setEnabled(False)
         layout.addWidget(btn_reset)
 
         # Botón Aplicar reglas (el más importante)
-        self._btn_apply = QPushButton("Aplicar reglas")
+        self._btn_apply = QPushButton("Activar Cortafuegos")
         self._btn_apply.setObjectName("btn_apply")
         self._btn_apply.setToolTip(
-            "Resuelve los dominios, carga ipset y aplica las reglas iptables.\n"
-            f"Guarda el archivo en: {self._config.get('rules_file', '') or LINUX_RULES_FILE}"
+            "Carga y activa el bloqueo de sitios web, limitaciones y reglas en el sistema.\n"
+            f"Guarda las reglas en: {self._config.get('rules_file', '') or LINUX_RULES_FILE}"
         )
         self._btn_apply.clicked.connect(self._apply_rules)
         if self._mode == "demo":
@@ -181,7 +182,7 @@ class MainWindow(QMainWindow):
                 page.update_config(new_config)
         self._status_label.setText("Configuracion guardada.")
         self._pending_changes = True
-        self._btn_apply.setText("Aplicar cambios *")
+        self._btn_apply.setText("Guardar y Activar *")
         # Actualizar ruta en header
         rules_path = new_config.get("rules_file", "") or LINUX_RULES_FILE
         self._rules_path_lbl.setText(f"Reglas: {rules_path}")
@@ -199,10 +200,10 @@ class MainWindow(QMainWindow):
 
         if not any([has_sites, has_mac, has_conn, has_clisrv]):
             QMessageBox.information(
-                self, "Sin reglas configuradas",
-                "No hay ninguna regla habilitada.\n\n"
-                "Ve a cada pestaña y activa lo que querés bloquear,\n"
-                "luego volvé a presionar 'Aplicar reglas'.",
+                self, "Sin bloqueos configurados",
+                "No has activado ningún bloqueo.\n\n"
+                "Ve a las pestañas superiores (Sitios Web, Bloqueo MAC, etc.) "
+                "y activa al menos una casilla antes de Activar el Cortafuegos.",
             )
             return
 
@@ -210,10 +211,10 @@ class MainWindow(QMainWindow):
         rules_path = self._config.get("rules_file", "") or LINUX_RULES_FILE
 
         reply = QMessageBox.question(
-            self, "Aplicar reglas",
-            f"Se aplicarán las reglas iptables sobre <b>{lan_iface}</b>.\n"
-            f"El archivo de reglas se guardará en:\n<b>{rules_path}</b>\n\n"
-            "¿Continuar?",
+            self, "Activar Cortafuegos",
+            f"Se aplicarán las reglas de bloqueo sobre la interfaz <b>{lan_iface}</b>.\n"
+            f"El archivo se guardará en:\n<b>{rules_path}</b>\n\n"
+            "¿Deseas activar el cortafuegos ahora?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -239,16 +240,16 @@ class MainWindow(QMainWindow):
         self._status_label.setText(msg)
         if ok:
             self._pending_changes = False
-            self._btn_apply.setText("Aplicar reglas")
-            QMessageBox.information(self, "Reglas aplicadas", msg)
+            self._btn_apply.setText("Activar Cortafuegos")
+            QMessageBox.information(self, "Cortafuegos Activo", "¡El cortafuegos se ha activado y configurado correctamente!")
         else:
-            QMessageBox.warning(self, "Error al aplicar", msg)
+            QMessageBox.warning(self, "Error al activar", msg)
 
     def _reset_iptables(self):
         reply = QMessageBox.warning(
-            self, "Limpiar iptables",
-            "Esto eliminará TODAS las reglas iptables activas.\n"
-            "Los sitios bloqueados volverán a ser accesibles.\n\n¿Continuar?",
+            self, "Apagar Cortafuegos",
+            "¿Estás seguro de que deseas desactivar el cortafuegos?\n"
+            "Esto detendrá todos los bloqueos y los sitios volverán a ser accesibles inmediatamente.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -256,8 +257,8 @@ class MainWindow(QMainWindow):
             return
         from app.services import firewall_service
         ok, msg = firewall_service.flush_all()
-        self._status_label.setText(msg)
+        self._status_label.setText("Cortafuegos apagado.")
         if ok:
-            QMessageBox.information(self, "Reglas eliminadas", msg)
+            QMessageBox.information(self, "Cortafuegos apagado", "Se han eliminado todas las reglas. El tráfico está libre.")
         else:
             QMessageBox.warning(self, "Error", msg)
