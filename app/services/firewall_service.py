@@ -122,9 +122,25 @@ def apply_rules(
         command_runner.run(["ip6tables", "-P", "FORWARD", "DROP"])
         command_runner.run(["ip6tables", "-P", "OUTPUT", "DROP"])
 
+        # Destruir TODAS las conexiones activas en la tabla de estados del router.
+        # Esto es vital: Si YouTube ya estaba reproduciendo un video, la conexion (ESTABLISHED)
+        # evadira la nueva regla SNI. Al borrar la tabla conntrack, forzamos a los clientes a 
+        # re-negociar el TLS, lo cual expone el 'youtube.com' al SNI blocker y los destruye.
+        try:
+            # Borrar las entradas IPv4
+            command_runner.run(["conntrack", "-F", "ipv4"])
+            # Por si acaso borrar las IPv6
+            command_runner.run(["conntrack", "-F", "ipv6"])
+        except Exception:
+            # Si conntrack no esta instalado, intentamos el flush general por si lo soporta sin parametros
+            try:
+                command_runner.run(["conntrack", "-F"])
+            except Exception:
+                pass
+
         rule_count = rules_builder.get_rule_count(rules_content)
         return True, (
-            f"Reglas aplicadas. {rule_count} reglas en {target_path} (IPv6 deshabilitado para evitar fugas)."
+            f"Reglas aplicadas. {rule_count} reglas en {target_path} (IPv6 deshabilitado y Conexiones activas destruidas)."
         )
     return False, stderr.strip() or "Error al aplicar reglas."
 
