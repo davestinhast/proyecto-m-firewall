@@ -7,6 +7,7 @@ Permite bloquear de forma 100% inmune a la aleatorización de mayúsculas (0x20 
 import socket
 import threading
 import logging
+from pathlib import Path
 from app.constants import DNS_PROXY_PORT
 
 logger = logging.getLogger("dns_proxy")
@@ -15,11 +16,29 @@ logging.basicConfig(level=logging.INFO)
 _server_instance = None
 _server_lock = threading.Lock()
 
+def detect_upstream_dns() -> str:
+    """Detecta dinámicamente el servidor DNS configurado en el sistema (evita loopbacks)."""
+    try:
+        resolv = Path("/etc/resolv.conf")
+        if resolv.exists():
+            for line in resolv.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if line.startswith("nameserver "):
+                    ns = line.split()[1].strip()
+                    # Ignorar direcciones loopback locales para no causar bucles infinitos
+                    if ns not in ["127.0.0.1", "127.0.0.53", "127.0.1.1", "::1"]:
+                        logger.info(f"DNS Proxy: Detectado DNS del sistema activo: {ns}")
+                        return ns
+    except Exception as e:
+        logger.error(f"Error al leer /etc/resolv.conf: {e}")
+    # Fallback predeterminado a Google DNS si no hay DNS local
+    return "8.8.8.8"
+
 class DNSProxyServer:
-    def __init__(self, ip="0.0.0.0", port=DNS_PROXY_PORT, upstream="8.8.8.8"):
+    def __init__(self, ip="0.0.0.0", port=DNS_PROXY_PORT):
         self.ip = ip
         self.port = port
-        self.upstream = upstream
+        self.upstream = "8.8.8.8"
         self.sock = None
         self.running = False
         self.thread = None
@@ -30,6 +49,10 @@ class DNSProxyServer:
             self.config = config
             if self.running:
                 return
+            
+            # Detectar el DNS activo de la red del usuario
+            self.upstream = detect_upstream_dns()
+            
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 # Permitir reusar la dirección/puerto
@@ -38,12 +61,14 @@ class DNSProxyServer:
                 self.running = True
                 self.thread = threading.Thread(target=self._listen, daemon=True)
                 self.thread.start()
-                logger.info(f"Servidor DNS Proxy iniciado en {self.ip}:{self.port} (Upstream: {self.upstream})")
+                logger.info(f"Servidor DNS Proxy iniciado en {self.ip}:{self.port} (Upstream redirigido a: {self.upstream})")
             except Exception as e:
                 logger.error(f"Error al iniciar DNS Proxy: {e}")
 
     def update_config(self, config: dict):
         self.config = config
+        # Refrescar el upstream por si cambió la interfaz de red
+        self.upstream = detect_upstream_dns()
 
     def stop(self):
         with _server_lock:
@@ -117,21 +142,21 @@ class DNSProxyServer:
             if cfg.get("enabled", False):
                 has_blocked = True
                 if key == "facebook":
-                    keywords += [b"facebook", b"fbcdn"]
+                    keywords += ["facebook", "fbcdn"]
                 elif key == "youtube":
-                    keywords += [b"youtu", b"googlevideo", b"ytimg"]
+                    keywords += ["youtu", "googlevideo", "ytimg"]
                 elif key == "hotmail":
-                    keywords += [b"hotmail", b"outlook", b"live.com"]
+                    keywords += ["hotmail", "outlook", "live.com"]
 
         # Si hay al menos un sitio bloqueado, siempre cegar servidores DoH y DNS alternativos
         if has_blocked:
-            keywords += [b"dns.google", b"cloudflare-dns", b"dns.quad9", b"use-application-dns.net"]
+            keywords += ["dns.google", "cloudflare-dns", "dns.quad9", "use-application-dns.net"]
 
-        # Analizar payload DNS de forma case-insensitive
-        payload_lower = data.lower()
+        # Realizar coincidencia case-insensitive sobre el nombre decodificado
+        domain_lower = domain.lower()
         should_block = False
         for kw in keywords:
-            if kw in payload_lower:
+            if kw in domain_lower:
                 should_block = True
                 break
 
@@ -154,7 +179,7 @@ class DNSProxyServer:
             except Exception:
                 pass
         else:
-            # Reenviar al servidor DNS real aguas arriba (upstream)
+            # Reenviar al DNS de la red real detectado dinámicamente
             try:
                 up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 up_sock.settimeout(2.0)
