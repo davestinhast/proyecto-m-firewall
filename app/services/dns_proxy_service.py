@@ -181,9 +181,11 @@ class DNSProxyServer:
         else:
             # Reenviar al DNS de la red real detectado dinámicamente
             try:
+                # Obtener el DNS original en tiempo real para NUNCA romper el internet si la red cambia
+                current_upstream = detect_upstream_dns()
                 up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 up_sock.settimeout(2.0)
-                up_sock.sendto(data, (self.upstream, 53))
+                up_sock.sendto(data, (current_upstream, 53))
                 resp, _ = up_sock.recvfrom(2048)
                 self.sock.sendto(resp, addr)
                 up_sock.close()
