@@ -12,6 +12,16 @@ _project_root = os.path.dirname(os.path.abspath(__file__))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+# Bajo sudo en Kali, los paquetes del sistema pueden no estar en sys.path.
+# Inyectarlos explícitamente antes de cualquier import de PySide6.
+_sys_pkgs = [
+    "/usr/lib/python3/dist-packages",
+    f"/usr/lib/python3.{sys.version_info.minor}/dist-packages",
+]
+for _p in _sys_pkgs:
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(1, _p)
+
 try:
     from app.main import main
 except Exception as e:
