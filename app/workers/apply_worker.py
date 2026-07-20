@@ -62,11 +62,11 @@ class ApplyWorker(QThread):
                 self.log_line.emit("Inyectando reglas en la tabla filter de iptables:")
                 self.log_line.emit("[COMANDO] iptables -A PM_WEBBLOCK -p tcp --dport 80 -m set --match-set PM_FACEBOOK dst -j PM_REJECT")
                 self.log_line.emit("[COMANDO] iptables -A PM_WEBBLOCK -p tcp --dport 443 -m set --match-set PM_FACEBOOK dst -j PM_REJECT")
-                self.log_line.emit("[SISTEMA] Protección para Facebook lista. Esperando 5 segundos para continuar...")
+                self.log_line.emit("[SISTEMA] Protección para Facebook lista.")
             else:
                 self.log_line.emit("\n[SISTEMA] Facebook no está marcado para bloquear. Omitiendo...")
-            
-            time.sleep(5)
+
+            time.sleep(1)
 
             # --- BLOQUEO DE HOTMAIL ---
             self.progress.emit(50, "Configurando bloqueo de Hotmail...")
@@ -87,11 +87,11 @@ class ApplyWorker(QThread):
                 self.log_line.emit("Inyectando reglas en la tabla filter de iptables:")
                 self.log_line.emit("[COMANDO] iptables -A PM_WEBBLOCK -p tcp --dport 80 -m set --match-set PM_HOTMAIL dst -j PM_REJECT")
                 self.log_line.emit("[COMANDO] iptables -A PM_WEBBLOCK -p tcp --dport 443 -m set --match-set PM_HOTMAIL dst -j PM_REJECT")
-                self.log_line.emit("[SISTEMA] Protección para Hotmail/Outlook lista. Esperando 5 segundos para continuar...")
+                self.log_line.emit("[SISTEMA] Protección para Hotmail/Outlook lista.")
             else:
                 self.log_line.emit("\n[SISTEMA] Hotmail/Outlook no está marcado para bloquear. Omitiendo...")
-            
-            time.sleep(5)
+
+            time.sleep(1)
 
             # --- BLOQUEO DE YOUTUBE ---
             self.progress.emit(75, "Configurando bloqueo de YouTube...")
@@ -130,11 +130,11 @@ class ApplyWorker(QThread):
                 self.log_line.emit("Limpiando registros de DNS local de la máquina para evitar bypass por caché:")
                 self.log_line.emit("[COMANDO] systemctl restart systemd-resolved")
                 self.log_line.emit("[COMANDO] resolvectl flush-caches")
-                self.log_line.emit("[SISTEMA] Protección agresiva para YouTube lista. Esperando 5 segundos para continuar...")
+                self.log_line.emit("[SISTEMA] Protección agresiva para YouTube lista.")
             else:
                 self.log_line.emit("\n[SISTEMA] YouTube no está marcado para bloquear. Omitiendo...")
 
-            time.sleep(5)
+            time.sleep(1)
 
             # Paso 5: Generar y compilar la configuración final
             self.progress.emit(90, "Compilando reglas de iptables...")

@@ -282,10 +282,12 @@ class MacPage(QWidget):
             self.config_changed.emit(self._config)
 
     def showEvent(self, event):
-        """Auto-escanear al abrir la página si aún no hay dispositivos."""
+        """Solo auto-escanea la primera vez que se abre la página."""
         super().showEvent(event)
-        if not self._scanned_devices and not (self._scan_worker and self._scan_worker.isRunning()):
-            self._start_scan()
+        if not hasattr(self, "_shown_once"):
+            self._shown_once = True
+            if not self._scanned_devices and not (self._scan_worker and self._scan_worker.isRunning()):
+                self._start_scan()
 
     def update_config(self, config: dict):
         self._config = config

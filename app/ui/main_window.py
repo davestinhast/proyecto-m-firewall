@@ -256,8 +256,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         if reply == QMessageBox.StandardButton.Yes:
-            firewall_service.flush_all()
-            firewall_service.remove_hosts_block()
+            firewall_service.flush_all()  # flush_all ya limpia /etc/hosts internamente
             try:
                 from app.services.dns_proxy_service import get_dns_proxy
                 get_dns_proxy().stop()

@@ -321,6 +321,10 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
         # Aceptar tráfico hacia el DNS Proxy local en el puerto 10053
         f"-A INPUT -p udp --dport 10053 -j ACCEPT",
         f"-A INPUT -p tcp --dport 10053 -j ACCEPT",
+        # Limite de conexiones (connlimit) aplica tambien a conexiones directas a Kali
+        f"-A INPUT -j {CHAIN_CONNLIMIT}",
+        # Bloqueo cliente-servidor aplica tambien cuando Kali ES el servidor destino
+        f"-A INPUT -j {CHAIN_CLISRV}",
         f"-A INPUT -j {CHAIN_WEBBLOCK}",
     ]
 
