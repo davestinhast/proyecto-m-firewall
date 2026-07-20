@@ -267,6 +267,13 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             else:
                 lines.append(f"# SNI inspect omitido (xt_string no disponible o sin keywords)")
 
+        # Bloquear DNS-over-TLS (DoT, puerto 853) para forzar uso del DNS Proxy local
+        # Esto evita que clientes usen Cloudflare/Google DoT para saltarse el proxy DNS
+        lines.append("")
+        lines.append("# Bloqueo DNS-over-TLS (puerto 853) — fuerza uso del DNS Proxy local")
+        lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp --dport 853 -j {IPTABLES_CHAIN_REJECT}")
+        lines.append(f"-A {CHAIN_WEBBLOCK} -p udp --dport 853 -j {IPTABLES_CHAIN_REJECT}")
+
         # El bloqueo DNS inteligente se activa de forma AUTOMÁTICA para cualquier dominio que esté habilitado.
         # Así el usuario no tiene que activar casillas avanzadas complejas.
         if has_webblock:
