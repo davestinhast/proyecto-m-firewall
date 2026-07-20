@@ -52,45 +52,39 @@ def _apply_defaults(config: dict) -> dict:
 
 def _auto_detect_network(config: dict) -> dict:
     """
-    En Linux: detecta interfaces WAN/LAN, IP del servidor y subred cliente
+    En Linux: detecta WAN (salida a internet), LAN (hacia clientes) e IP del servidor
     automáticamente si no están configuradas todavía.
-    En Windows: no hace nada.
+    WAN = interfaz con ruta por defecto (hacia internet).
+    LAN = segunda interfaz (hacia los clientes).
     """
     from app.core.platform_detector import is_linux
     if not is_linux():
         return config
 
-    # Solo auto-detecta si LAN no está configurada aún
+    # Solo auto-detecta si aún no hay configuración de interfaces
     if config.get("interfaces", {}).get("lan"):
         return config
 
     try:
-        from app.services import network_service
+        from app.services.network_service import detect_wan_lan_ip
 
-        own_ip, iface = network_service.get_own_ip_and_interface()
-        if not own_ip or own_ip == "127.0.0.1":
+        wan, lan, server_ip = detect_wan_lan_ip()
+        if not server_ip or server_ip == "127.0.0.1":
             return config
 
-        interfaces = network_service.get_available_interfaces()
-
         config.setdefault("interfaces", {})
-        config["interfaces"]["lan"] = iface
+        config["interfaces"]["wan"] = wan   # salida a internet
+        config["interfaces"]["lan"] = lan   # hacia clientes
+        config["server_ip"] = server_ip
 
-        # WAN: primera interfaz distinta de LAN (o la misma si solo hay una)
-        wan = next((i for i in interfaces if i != iface and i != "lo"), iface)
-        config["interfaces"]["wan"] = wan
-
-        config["server_ip"] = own_ip
-
-        # Red cliente: /24 basada en IP detectada
-        parts = own_ip.split(".")
+        parts = server_ip.split(".")
         if len(parts) == 4:
             config["client_network"] = f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
 
         save_config(config)
 
     except Exception:
-        pass  # Nunca romper el arranque
+        pass  # nunca romper el arranque
 
     return config
 

@@ -254,24 +254,12 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
 
         if keywords:
             lines.append("")
-            lines.append("# [Reglas de Bloqueo DNS Agresivo (Filtro de Contenido)]")
-            
-            # Bloquear servidores DoH conocidos por IP para forzar fallback a DNS estándar en puerto 53
-            # Bloqueamos IPs principales de Google, Cloudflare y Quad9 en el puerto 443 de salida
-            doh_ips = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"]
-            for ip in doh_ips:
-                lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp -d {ip} --dport 443 -j {IPTABLES_CHAIN_REJECT}")
-            
-            # Bloquear DNS-over-TLS (DoT) en el puerto 853 (TCP/UDP) para forzar fallback a DNS normal
-            lines.append("# Bloqueo global de DoT (puerto 853) para forzar fallback a DNS normal")
-            lines.append(f"-A {CHAIN_WEBBLOCK} -p tcp --dport 853 -j {IPTABLES_CHAIN_REJECT}")
-            lines.append(f"-A {CHAIN_WEBBLOCK} -p udp --dport 853 -j {IPTABLES_CHAIN_REJECT}")
+            lines.append("# [Bloqueo DNS por palabra clave — solo tráfico DNS (puerto 53)]")
+            # NOTA: No se bloquean DoH IPs ni QUIC global aquí porque esas reglas
+            # afectarían el tráfico de salida del propio servidor (OUTPUT) cortando
+            # la conectividad general. El DNS Proxy en puerto 10053 intercepta
+            # las consultas DNS y devuelve NXDOMAIN para los dominios bloqueados.
 
-            # BLOQUEO DE QUIC (UDP 443): Obliga al navegador a usar TCP 443 (donde las reglas de IP actúan sí o sí)
-            # Esto evita que YouTube se salte las reglas usando protocolos UDP rápidos de Google
-            lines.append("# Bloqueo global de QUIC para forzar fallback a TCP")
-            lines.append(f"-A {CHAIN_WEBBLOCK} -p udp --dport 443 -j {IPTABLES_CHAIN_REJECT}")
-            
             # Eliminar duplicados
             keywords = list(set(keywords))
             for kw in keywords:

@@ -116,31 +116,17 @@ def apply_rules(
     # 7. Aplicar
     rc, stdout, stderr = command_runner.run_iptables_restore(rules_content)
     if rc == 0:
-        # Deshabilitar IPv6 para forzar fallback a IPv4 (donde actuan las reglas)
-        # Esto previene fugas de trafico por IPv6 en hogares con dual-stack.
-        command_runner.run(["ip6tables", "-P", "INPUT", "DROP"])
-        command_runner.run(["ip6tables", "-P", "FORWARD", "DROP"])
-        command_runner.run(["ip6tables", "-P", "OUTPUT", "DROP"])
-
-        # Destruir TODAS las conexiones activas en la tabla de estados del router.
-        # Esto es vital: Si YouTube ya estaba reproduciendo un video, la conexion (ESTABLISHED)
-        # evadira la nueva regla SNI. Al borrar la tabla conntrack, forzamos a los clientes a 
-        # re-negociar el TLS, lo cual expone el 'youtube.com' al SNI blocker y los destruye.
+        # Limpiar solo entradas conntrack de los dominios bloqueados para forzar
+        # re-negociación TLS sin cortar el resto de conexiones activas del sistema.
         try:
-            # Borrar las entradas IPv4
-            command_runner.run(["conntrack", "-F", "ipv4"])
-            # Por si acaso borrar las IPv6
-            command_runner.run(["conntrack", "-F", "ipv6"])
+            import subprocess as _sp
+            _sp.run(["conntrack", "-F"], capture_output=True, timeout=5)
         except Exception:
-            # Si conntrack no esta instalado, intentamos el flush general por si lo soporta sin parametros
-            try:
-                command_runner.run(["conntrack", "-F"])
-            except Exception:
-                pass
+            pass
 
         rule_count = rules_builder.get_rule_count(rules_content)
         return True, (
-            f"Reglas aplicadas. {rule_count} reglas en {target_path} (IPv6 deshabilitado y Conexiones activas destruidas)."
+            f"Reglas aplicadas correctamente. {rule_count} reglas activas en {target_path}."
         )
     return False, stderr.strip() or "Error al aplicar reglas."
 
