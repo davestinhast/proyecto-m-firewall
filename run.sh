@@ -12,11 +12,8 @@ if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
         echo "[M-FIREWALL] Se necesita root para iptables. Elevando permisos..."
         chmod +x "$SCRIPT_ABS" 2>/dev/null || true
 
-        # Calcular PYTHONPATH antes de sudo (env_reset en Kali borra vars con -E)
-        PYVER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.11")
-        PYPATH="$SCRIPT_DIR:/usr/lib/python3/dist-packages:/usr/lib/python${PYVER}/dist-packages:/usr/local/lib/python${PYVER}/dist-packages"
-
-        # Pasar PYTHONPATH explícito — no depender de -E
+        # Pasar PYTHONPATH explícito — solo el directorio del proyecto
+        # NO forzar /usr/lib/python3/dist-packages: conflicta con PySide6 de pip
         exec sudo \
             DISPLAY="${DISPLAY:-:0}" \
             XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
@@ -25,7 +22,7 @@ if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
             DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
             HOME="$HOME" \
             PATH="$PATH" \
-            PYTHONPATH="$PYPATH" \
+            PYTHONPATH="$SCRIPT_DIR" \
             bash "$SCRIPT_ABS" "$@"
     fi
 
@@ -53,7 +50,7 @@ cd "$SCRIPT_DIR"
 
 # Asegurar que el directorio del proyecto esté en PYTHONPATH
 # (sys.path.insert en run.py no siempre funciona bajo sudo)
-export PYTHONPATH="$SCRIPT_DIR:/usr/lib/python3/dist-packages:/usr/lib/python3/dist-packages/PySide6${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
 # Lanzar (python3 primero, python como fallback)
 if command -v python3 &>/dev/null; then
