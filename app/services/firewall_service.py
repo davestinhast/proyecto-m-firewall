@@ -219,9 +219,20 @@ def deep_reset_network() -> tuple[bool, str]:
             lines = hosts_path.read_text(encoding="utf-8", errors="ignore").splitlines()
             clean_lines = []
             removed_count = 0
-            block_keywords = ["facebook", "youtube", "hotmail", "live.com", "outlook", "fbcdn"]
+            block_keywords = [
+                "facebook", "youtube", "hotmail", "live.com", "outlook", "fbcdn",
+                "googlevideo", "ytimg", "ggpht", "youtu", "messenger", "ytstatic",
+                "fbsbx", "fb.com", "microsoftonline",
+            ]
+            skip_markers = {"# BEGIN M-FIREWALL-CLEAN", "# END M-FIREWALL-CLEAN"}
             for line in lines:
-                if any(kw in line.lower() for kw in block_keywords) and not line.strip().startswith("#"):
+                stripped = line.strip()
+                # Eliminar marcadores del bloque M-FIREWALL
+                if stripped in skip_markers:
+                    removed_count += 1
+                    continue
+                # Eliminar entradas 0.0.0.0 de bloqueo que no sean comentarios
+                if not stripped.startswith("#") and any(kw in stripped.lower() for kw in block_keywords):
                     removed_count += 1
                 else:
                     clean_lines.append(line)
@@ -233,18 +244,18 @@ def deep_reset_network() -> tuple[bool, str]:
         except Exception as e:
             log_msgs.append(f"Error al limpiar /etc/hosts: {e}")
 
-    # 4. Restaurar /etc/resolv.conf
+    # 4. Restaurar /etc/resolv.conf — NUNCA borrar, solo escribir DNS de respaldo
     try:
-        # En Linux, NetworkManager gestiona /etc/resolv.conf a través de DHCP.
-        # En lugar de forzar 8.8.8.8 (que algunos ISPs como Claro bloquean),
-        # borramos el archivo manual y reiniciamos NetworkManager para que el ISP asigne el correcto.
         import os
-        if os.path.exists("/etc/resolv.conf"):
-            os.remove("/etc/resolv.conf")
-        subprocess.run(["systemctl", "restart", "NetworkManager"], timeout=10)
-        log_msgs.append("DNS restablecido: NetworkManager reiniciado para obtener los DNS del ISP original por DHCP.")
+        resolv_path = "/etc/resolv.conf"
+        # Si es un symlink roto o no existe, recrear con Google DNS
+        if os.path.islink(resolv_path) and not os.path.exists(resolv_path):
+            os.unlink(resolv_path)
+        with open(resolv_path, "w") as f:
+            f.write("# Restaurado por M-FIREWALL\nnameserver 8.8.8.8\nnameserver 8.8.4.4\n")
+        log_msgs.append("DNS restablecido: /etc/resolv.conf restaurado con servidores de respaldo.")
     except Exception as e:
-        log_msgs.append(f"Error al reiniciar NetworkManager para restaurar DNS: {e}")
+        log_msgs.append(f"Nota al restaurar DNS: {e}")
 
     return True, "\n".join(log_msgs)
 
