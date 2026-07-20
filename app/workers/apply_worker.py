@@ -26,7 +26,7 @@ class ApplyWorker(QThread):
             wan = self._config.get("interfaces", {}).get("wan", "")
             lan = self._config.get("interfaces", {}).get("lan", "")
 
-            self.log_line.emit("[SISTEMA] Iniciando proceso de activación del cortafuegos...")
+            self.log_line.emit("[SISTEMA] Iniciando proceso de activación del firewall...")
             self.progress.emit(5, "Iniciando...")
             time.sleep(1)
 
@@ -158,7 +158,7 @@ class ApplyWorker(QThread):
             )
             
             if ok:
-                self.log_line.emit("\n[!] CORTAFUEGOS CONFIGURADO Y ACTIVO CORRECTAMENTE.")
+                self.log_line.emit("\n[!] FIREWALL CONFIGURADO Y ACTIVO CORRECTAMENTE.")
                 self.log_line.emit("[!] Todos los bloqueos han sido aplicados con éxito en el kernel.")
             else:
                 self.log_line.emit(f"\n[ERROR] Falló la aplicación en el sistema: {msg}")

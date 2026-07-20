@@ -392,7 +392,7 @@ class _DiagPanel(QFrame):
         # Header del panel (siempre visible)
         header_row = QHBoxLayout()
 
-        title = QLabel("Diagnóstico de Red y Cortafuegos")
+        title = QLabel("Diagnóstico de Red y Firewall")
         title.setObjectName("label_subtitle")
         header_row.addWidget(title)
 
@@ -401,7 +401,7 @@ class _DiagPanel(QFrame):
         self._btn_reset_net = QPushButton("Desbloquear Red y DNS")
         self._btn_reset_net.setObjectName("btn_danger")
         self._btn_reset_net.setToolTip(
-            "Restaura y limpia de raíz cualquier configuración del cortafuegos\n"
+            "Restaura y limpia de raíz cualquier configuración del firewall\n"
             "para recuperar la conectividad si algo falló o se bloqueó accidentalmente."
         )
         self._btn_reset_net.clicked.connect(self._run_deep_reset)
@@ -424,7 +424,7 @@ class _DiagPanel(QFrame):
         self._summary_row.setSpacing(20)
 
         self._lbl_ipset    = self._make_status_lbl("Bases de Datos IP")
-        self._lbl_webblock = self._make_status_lbl("Cortafuegos de Sitios")
+        self._lbl_webblock = self._make_status_lbl("Firewall de Sitios")
         self._lbl_ipfwd    = self._make_status_lbl("Compartir Internet")
         self._lbl_nft      = self._make_status_lbl("Compatibilidad nftables")
 
@@ -484,7 +484,7 @@ class _DiagPanel(QFrame):
         reply = QMessageBox.warning(
             self, "Desbloquear Red y DNS",
             "¿Deseas restaurar la conectividad de red por completo?\n\n"
-            "Esto eliminará todos los bloqueos activos, borrará las configuraciones del cortafuegos\n"
+            "Esto eliminará todos los bloqueos activos, borrará las configuraciones del firewall\n"
             "y restablecerá el servicio de internet. Úsalo si pierdes conexión o si quieres empezar de cero.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
@@ -524,11 +524,11 @@ class _DiagPanel(QFrame):
 
         # PM_WEBBLOCK
         if "Chain no existe" in output or "does not exist" in output:
-            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Inactivo", "err")
+            self._set_lbl(self._lbl_webblock, "Firewall de Sitios: Inactivo", "err")
         elif "match-set" in output or "PM_REJECT" in output:
-            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Activo", "ok")
+            self._set_lbl(self._lbl_webblock, "Firewall de Sitios: Activo", "ok")
         else:
-            self._set_lbl(self._lbl_webblock, "Cortafuegos de Sitios: Vacío", "warn")
+            self._set_lbl(self._lbl_webblock, "Firewall de Sitios: Vacío", "warn")
 
         # IP Forward
         if "= 1" in output or "= 1\n" in output:
@@ -768,6 +768,37 @@ class WebsitesPage(QWidget):
         title_row.addWidget(btn_flush)
 
         layout.addLayout(title_row)
+
+        # ── Tarjeta de instrucciones (para usuarios sin experiencia técnica) ──
+        how_to_card = QFrame()
+        how_to_card.setObjectName("card_accent_blue")
+        how_to_layout = QHBoxLayout(how_to_card)
+        how_to_layout.setContentsMargins(20, 12, 20, 12)
+        how_to_layout.setSpacing(28)
+
+        icon_lbl = QLabel("ℹ")
+        icon_lbl.setStyleSheet(
+            "font-size: 20px; color: #3b82f6; font-weight: bold; background: transparent;"
+        )
+        icon_lbl.setFixedWidth(24)
+        how_to_layout.addWidget(icon_lbl)
+
+        steps_lbl = QLabel(
+            "<b style='color:#e8eaf0;'>¿Cómo usar?</b>"
+            "&nbsp;&nbsp;&nbsp;"
+            "<span style='color:#60a5fa;'>Paso 1:</span>"
+            " <span style='color:#a0b8d8;'>Marca la casilla de los sitios que quieres bloquear.</span>"
+            "&nbsp;&nbsp;&nbsp;"
+            "<span style='color:#60a5fa;'>Paso 2:</span>"
+            " <span style='color:#a0b8d8;'>Haz clic en el botón</span>"
+            " <b style='color:#3b82f6;'>Activar Firewall</b>"
+            " <span style='color:#a0b8d8;'>en la parte inferior de la ventana.</span>"
+        )
+        steps_lbl.setTextFormat(Qt.TextFormat.RichText)
+        steps_lbl.setWordWrap(True)
+        how_to_layout.addWidget(steps_lbl, stretch=1)
+
+        layout.addWidget(how_to_card)
 
         # Barra de estado mejorada
         self._status_bar = _StatusBar(self._config)

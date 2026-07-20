@@ -214,7 +214,7 @@ QPushButton:disabled {
     color: #fca5a5;
 }
 
-/* Botón apagar cortafuegos */
+/* Botón apagar firewall */
 #btn_reset_firewall, QPushButton[objectName="btn_reset_firewall"] {
     background-color: transparent;
     border-color: #3a2020;

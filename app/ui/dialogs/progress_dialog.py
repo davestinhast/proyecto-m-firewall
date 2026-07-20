@@ -1,5 +1,5 @@
 """
-Diálogo de progreso de activación del cortafuegos.
+Diálogo de progreso de activación del firewall.
 Muestra una interfaz estilo terminal que imprime los comandos ejecutados paso a paso.
 """
 
@@ -80,7 +80,7 @@ class ApplyProgressDialog(QDialog):
         layout.setSpacing(14)
 
         # Encabezado
-        self._title = QLabel("<b>Ejecutando Comandos del Cortafuegos en el Núcleo</b>")
+        self._title = QLabel("<b>Ejecutando Comandos del Firewall en el Núcleo</b>")
         self._title.setStyleSheet("font-size: 14px; color: #3b82f6;")
         layout.addWidget(self._title)
 
@@ -130,9 +130,9 @@ class ApplyProgressDialog(QDialog):
     def _on_finished(self, ok: bool, msg: str):
         self._btn_close.setEnabled(True)
         if ok:
-            self._title.setText("<b>¡Activación del Cortafuegos Completada!</b>")
+            self._title.setText("<b>¡Activación del Firewall Completada!</b>")
             self._title.setStyleSheet("font-size: 14px; color: #22c55e;")
-            self._desc.setText("El cortafuegos está activo y operativo.")
+            self._desc.setText("El firewall está activo y operativo.")
         else:
             self._title.setText("<b>Error al aplicar las reglas</b>")
             self._title.setStyleSheet("font-size: 14px; color: #ef4444;")

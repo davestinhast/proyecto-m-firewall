@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
         self._apply_worker = None
         self._pending_changes = False
 
-        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} — Administrador de Cortafuegos")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} — Administrador de Firewall")
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
         self.setStyleSheet(_load_stylesheet())
@@ -150,17 +150,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(authors_lbl)
 
         # Botón limpiar iptables
-        btn_reset = QPushButton("Apagar Cortafuegos")
+        btn_reset = QPushButton("Apagar Firewall")
         btn_reset.setObjectName("btn_reset_firewall")
         btn_reset.setStyleSheet("background-color: #3b111a; border-color: #551e24; color: #f87171;")
-        btn_reset.setToolTip("Desactiva temporalmente el cortafuegos y vuelve a permitir todo el tráfico.")
+        btn_reset.setToolTip("Desactiva temporalmente el firewall y vuelve a permitir todo el tráfico.")
         btn_reset.clicked.connect(self._reset_iptables)
         if self._mode == "demo":
             btn_reset.setEnabled(False)
         layout.addWidget(btn_reset)
 
         # Botón Aplicar reglas (el más importante)
-        self._btn_apply = QPushButton("Activar Cortafuegos")
+        self._btn_apply = QPushButton("Activar Firewall")
         self._btn_apply.setObjectName("btn_apply")
         self._btn_apply.setToolTip(
             "Carga y activa el bloqueo de sitios web, limitaciones y reglas en el sistema.\n"
@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
                 self, "Sin bloqueos configurados",
                 "No has activado ningún bloqueo.\n\n"
                 "Ve a las pestañas superiores (Sitios Web, Bloqueo MAC, etc.) "
-                "y activa al menos una casilla antes de Activar el Cortafuegos.",
+                "y activa al menos una casilla antes de Activar el Firewall.",
             )
             return
 
@@ -219,10 +219,10 @@ class MainWindow(QMainWindow):
         rules_path = self._config.get("rules_file", "") or LINUX_RULES_FILE
 
         reply = QMessageBox.question(
-            self, "Activar Cortafuegos",
+            self, "Activar Firewall",
             f"Se aplicarán las reglas de bloqueo sobre la interfaz <b>{lan_iface}</b>.\n"
             f"El archivo se guardará en:\n<b>{rules_path}</b>\n\n"
-            "¿Deseas activar el cortafuegos ahora?",
+            "¿Deseas activar el firewall ahora?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -236,15 +236,15 @@ class MainWindow(QMainWindow):
 
         # Al cerrarse el diálogo, refrescamos el estado de las pestañas
         self._pending_changes = False
-        self._btn_apply.setText("Activar Cortafuegos")
+        self._btn_apply.setText("Activar Firewall")
         for page in self._pages.values():
             if hasattr(page, "_verify_all"):
                 page._verify_all()
 
     def _reset_iptables(self):
         reply = QMessageBox.warning(
-            self, "Apagar Cortafuegos",
-            "¿Estás seguro de que deseas desactivar el cortafuegos?\n"
+            self, "Apagar Firewall",
+            "¿Estás seguro de que deseas desactivar el firewall?\n"
             "Esto detendrá todos los bloqueos y los sitios volverán a ser accesibles inmediatamente.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
@@ -253,8 +253,8 @@ class MainWindow(QMainWindow):
             return
         from app.services import firewall_service
         ok, msg = firewall_service.flush_all()
-        self._status_label.setText("Cortafuegos apagado.")
+        self._status_label.setText("Firewall apagado.")
         if ok:
-            QMessageBox.information(self, "Cortafuegos apagado", "Se han eliminado todas las reglas. El tráfico está libre.")
+            QMessageBox.information(self, "Firewall apagado", "Se han eliminado todas las reglas. El tráfico está libre.")
         else:
             QMessageBox.warning(self, "Error", msg)
