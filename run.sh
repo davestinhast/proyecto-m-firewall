@@ -12,8 +12,12 @@ if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
         echo "[M-FIREWALL] Se necesita root para iptables. Elevando permisos..."
         chmod +x "$SCRIPT_ABS" 2>/dev/null || true
 
-        # sudo preservando entorno gráfico (DISPLAY, Wayland, etc.)
-        exec sudo -E \
+        # Calcular PYTHONPATH antes de sudo (env_reset en Kali borra vars con -E)
+        PYVER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.11")
+        PYPATH="$SCRIPT_DIR:/usr/lib/python3/dist-packages:/usr/lib/python${PYVER}/dist-packages:/usr/local/lib/python${PYVER}/dist-packages"
+
+        # Pasar PYTHONPATH explícito — no depender de -E
+        exec sudo \
             DISPLAY="${DISPLAY:-:0}" \
             XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
             WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
@@ -21,6 +25,7 @@ if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
             DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
             HOME="$HOME" \
             PATH="$PATH" \
+            PYTHONPATH="$PYPATH" \
             bash "$SCRIPT_ABS" "$@"
     fi
 
