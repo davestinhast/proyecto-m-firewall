@@ -30,6 +30,13 @@ if [[ "$(uname -s 2>/dev/null)" == "Linux" ]]; then
     mkdir -p /var/log/proyecto-m
     touch /var/log/proyecto-m/iptables-rejected.log 2>/dev/null || true
     chmod 644 /var/log/proyecto-m/iptables-rejected.log 2>/dev/null || true
+
+    # Auto-reparar /etc/resolv.conf si no existe o está vacío
+    if [[ ! -s /etc/resolv.conf ]]; then
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+        echo "[M-FIREWALL] DNS restaurado automáticamente en /etc/resolv.conf"
+    fi
 fi
 
 # ── Activar entorno virtual si existe ───────────────────────────────────────
