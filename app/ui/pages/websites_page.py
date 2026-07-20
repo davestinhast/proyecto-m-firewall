@@ -433,18 +433,13 @@ class _DiagPanel(QFrame):
         self._summary_row.addStretch()
         layout.addLayout(self._summary_row)
 
-        # Area de texto colapsable (output completo)
+        # Area de texto colapsable (oculta por defecto)
         self._text_area = QTextEdit()
         self._text_area.setReadOnly(True)
-        self._text_area.setMinimumHeight(200)
-        self._text_area.setMaximumHeight(350)
+        self._text_area.setMinimumHeight(160)
+        self._text_area.setMaximumHeight(260)
         self._text_area.setPlaceholderText(
-            "Presiona 'Comprobar estado' para realizar una auditoría de red.\n\n"
-            "El sistema validará:\n"
-            "  - La instalación de ipset y las direcciones cargadas.\n"
-            "  - Las reglas activas en el núcleo de Linux.\n"
-            "  - La interferencia de otros programas del sistema.\n"
-            "  - El estado de la conectividad en tiempo real."
+            "Presiona 'Comprobar estado' para ver el diagnóstico de red."
         )
         self._text_area.setVisible(False)
         layout.addWidget(self._text_area)
@@ -778,19 +773,7 @@ class WebsitesPage(QWidget):
         self._status_bar = _StatusBar(self._config)
         layout.addWidget(self._status_bar)
 
-        # Nota tecnica sobre cache DNS
-        self._cache_notice = QLabel(
-            "Nota: Si el bloqueo no se refleja de inmediato en tu navegador, cierra y vuelve a abrirlo "
-            "(o usa una ventana en modo Incognito) para forzar la limpieza de su cache DNS interna."
-        )
-        self._cache_notice.setStyleSheet(
-            "color: #8892a4; font-size: 11px; font-weight: 500; background: transparent; "
-            "padding: 2px 4px;"
-        )
-        self._cache_notice.setWordWrap(True)
-        layout.addWidget(self._cache_notice)
-
-        # Panel de diagnostico
+        # Panel de diagnostico (colapsado por defecto)
         self._diag_panel = _DiagPanel()
         layout.addWidget(self._diag_panel)
 

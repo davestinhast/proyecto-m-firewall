@@ -66,7 +66,43 @@ def load_config() -> dict:
             return merged
         except Exception:
             pass
-    return copy.deepcopy(_DEFAULT_CONFIG)
+
+    # Primera ejecución: auto-detectar red y habilitar los 3 sitios
+    cfg = copy.deepcopy(_DEFAULT_CONFIG)
+    _auto_populate_defaults(cfg)
+    return cfg
+
+
+def _auto_populate_defaults(cfg: dict) -> None:
+    """Rellena la config con valores detectados automáticamente al primer arranque."""
+    from app.services.network_service import detect_wan_lan_ip
+    from app.constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
+
+    # Detectar interfaces y IP del servidor
+    try:
+        wan, lan, server_ip = detect_wan_lan_ip()
+        cfg["interfaces"]["wan"] = wan
+        cfg["interfaces"]["lan"] = lan
+        cfg["server_ip"] = server_ip
+        if server_ip:
+            import ipaddress
+            net = ipaddress.IPv4Network(f"{server_ip}/24", strict=False)
+            cfg["client_network"] = str(net)
+    except Exception:
+        pass
+
+    # Habilitar los 3 sitios bloqueados por defecto
+    blocked = copy.deepcopy(BLOCKED_DOMAINS)
+    for key in blocked:
+        blocked[key]["enabled"] = True
+    cfg["blocked_domains"] = blocked
+
+    # Habilitar connlimit en HTTP y HTTPS
+    profiles = copy.deepcopy(DEFAULT_CONN_PROFILES)
+    for p in profiles:
+        if p.get("port") in (80, 443):
+            p["enabled"] = True
+    cfg["conn_profiles"] = profiles
 
 
 def save_config(config: dict) -> bool:

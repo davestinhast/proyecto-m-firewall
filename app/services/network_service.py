@@ -238,3 +238,56 @@ def get_available_interfaces() -> list[str]:
         return sorted(os.listdir("/sys/class/net"))
     except Exception:
         return ["eth0", "eth1"]
+
+
+def detect_wan_lan_ip() -> tuple[str, str, str]:
+    """
+    Detecta automáticamente WAN, LAN y la IP del servidor Kali en la LAN.
+    Retorna (wan_iface, lan_iface, server_ip).
+    WAN = interfaz con ruta por defecto hacia internet.
+    LAN = segunda interfaz (hacia clientes).
+    server_ip = IP de Kali en la interfaz LAN.
+    """
+    if platform.system() == "Windows":
+        return "eth0", "eth1", "192.168.50.1"
+
+    wan = ""
+    try:
+        r = subprocess.run(["ip", "route"], capture_output=True, text=True, timeout=5)
+        for line in r.stdout.splitlines():
+            if line.startswith("default"):
+                m = re.search(r"dev\s+(\S+)", line)
+                if m:
+                    wan = m.group(1)
+                    break
+    except Exception:
+        pass
+
+    # LAN = cualquier interfaz que no sea lo, wan, docker, virbr, etc.
+    _skip = {"lo", wan}
+    _skip_prefix = ("docker", "br-", "virbr", "veth", "tun", "tap")
+    all_ifaces = get_available_interfaces()
+    candidates = [
+        i for i in all_ifaces
+        if i not in _skip and not any(i.startswith(p) for p in _skip_prefix)
+    ]
+    lan = candidates[0] if candidates else (wan or "eth1")
+
+    # IP del servidor en la interfaz LAN
+    server_ip = ""
+    try:
+        r = subprocess.run(
+            ["ip", "-4", "addr", "show", lan],
+            capture_output=True, text=True, timeout=5,
+        )
+        m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
+        if m:
+            server_ip = m.group(1)
+    except Exception:
+        pass
+
+    # Fallback: usar la IP con ruta al exterior
+    if not server_ip:
+        server_ip, _ = get_own_ip_and_interface()
+
+    return wan or "eth0", lan, server_ip
