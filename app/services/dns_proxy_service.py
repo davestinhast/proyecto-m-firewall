@@ -16,6 +16,21 @@ logging.basicConfig(level=logging.INFO)
 _server_instance = None
 _server_lock = threading.Lock()
 
+DNS_BLOCK_KEYWORDS = {
+    "facebook": ["facebook", "fbcdn", "fb.com", "messenger", "fbsbx"],
+    "youtube": [
+        "youtube",
+        "youtu",
+        "googlevideo",
+        "ytimg",
+        "ggpht",
+        "youtube-nocookie",
+        "youtubei",
+        "ytstatic",
+    ],
+    "hotmail": ["hotmail", "outlook", "live.com", "microsoftonline"],
+}
+
 def detect_upstream_dns() -> str:
     """Detecta dinámicamente el servidor DNS configurado en el sistema (evita loopbacks)."""
     try:
@@ -158,12 +173,7 @@ class DNSProxyServer:
         for key, cfg in blocked_domains.items():
             if cfg.get("enabled", False):
                 has_blocked = True
-                if key == "facebook":
-                    keywords += ["facebook", "fbcdn"]
-                elif key == "youtube":
-                    keywords += ["youtu", "googlevideo", "ytimg"]
-                elif key == "hotmail":
-                    keywords += ["hotmail", "outlook", "live.com"]
+                keywords += DNS_BLOCK_KEYWORDS.get(key, [])
 
         # Si hay al menos un sitio bloqueado, siempre cegar servidores DoH y DNS alternativos
         if has_blocked:

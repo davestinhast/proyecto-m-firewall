@@ -30,9 +30,23 @@
       "domains": [
         "youtube.com",
         "www.youtube.com",
+        "m.youtube.com",
         "youtu.be",
         "googlevideo.com",
-        "ytimg.com"
+        "www.googlevideo.com",
+        "ytimg.com",
+        "www.ytimg.com",
+        "yt3.ggpht.com",
+        "youtube-nocookie.com",
+        "www.youtube-nocookie.com",
+        "youtube.l.google.com",
+        "youtube-ui.l.google.com",
+        "ytimg.l.google.com",
+        "ytstatic.l.google.com",
+        "ggpht.com",
+        "www.ggpht.com",
+        "youtubei.googleapis.com",
+        "youtube.googleapis.com"
       ],
       "enabled": true
     },

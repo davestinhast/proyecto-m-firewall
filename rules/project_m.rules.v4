@@ -1,13 +1,19 @@
-# M-FIREWALL v1.0.0 — Archivo de reglas personalizado
-# Generado: 2026-07-13 10:53:45
-# NO EDITAR MANUALMENTE — generado por la aplicación
+# M-FIREWALL v1.0.0 — Archivo de reglas PERSONALIZADO
+# Generado: 2026-07-18 22:55:14
+# Guardado en: /opt/proyecto-m/rules/project_m.rules.v4
+# (NO se usa /etc/sysconfig/iptables — rúbrica requiere archivo personalizado)
 # Cargar con: iptables-restore < project_m.rules.v4
+# IPs bloqueadas via ipset: ipset restore < project_m.ipset
 
 *nat
 :PREROUTING ACCEPT [0:0]
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
+-A PREROUTING -p udp --dport 53 -j DNAT --to-destination 192.168.50.1:10053
+-A PREROUTING -p tcp --dport 53 -j DNAT --to-destination 192.168.50.1:10053
+-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j DNAT --to-destination 127.0.0.1:10053
+-A OUTPUT -p tcp --dport 53 -m owner ! --uid-owner 0 -j DNAT --to-destination 127.0.0.1:10053
 -A POSTROUTING -o eth0 -j MASQUERADE
 COMMIT
 
@@ -16,267 +22,272 @@ COMMIT
 :PM_MACBLOCK - [0:0]
 :PM_CONNLIMIT - [0:0]
 :PM_CLISRV - [0:0]
+:PM_DNSBLOCK - [0:0]
 :PM_REJECT - [0:0]
 :INPUT ACCEPT [0:0]
 :FORWARD ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 
-# --- Cadena PM_REJECT: registra y rechaza ---
+# [Cadena PM_REJECT: registra y rechaza]
 -A PM_REJECT -m limit --limit 5/min --limit-burst 10 -j LOG --log-prefix "PM-DROP " --log-level 4
 -A PM_REJECT -j DROP
 
-# --- Cadena PM_MACBLOCK: bloqueo por MAC ---
+# [Cadena PM_MACBLOCK: bloqueo por MAC]
 # MAC: Client1
 -A PM_MACBLOCK -i eth1 -m mac --mac-source 00:11:22:33:44:55 -j PM_REJECT
 
-# --- Cadena PM_CONNLIMIT: límite de conexiones ---
-# connlimit: SSH
+# [Cadena PM_CONNLIMIT: límite de conexiones simultáneas]
+# connlimit: SSH (max 3 conexiones en puerto 22/tcp)
 -A PM_CONNLIMIT -p tcp --dport 22 -m connlimit --connlimit-above 3 --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-# connlimit: HTTP
+# connlimit: HTTP (max 10 conexiones en puerto 80/tcp)
 -A PM_CONNLIMIT -p tcp --dport 80 -m connlimit --connlimit-above 10 --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-# connlimit: HTTPS
+# connlimit: HTTPS (max 10 conexiones en puerto 443/tcp)
 -A PM_CONNLIMIT -p tcp --dport 443 -m connlimit --connlimit-above 10 --connlimit-mask 32 -j REJECT --reject-with tcp-reset
 
-# --- Cadena PM_CLISRV: bloqueo cliente→servidor ---
+# [Cadena PM_CLISRV: bloqueo cliente-servidor]
 -A PM_CLISRV -i eth1 -s 192.168.50.10 -d 192.168.50.1 -m state --state ESTABLISHED,RELATED -j ACCEPT
 -A PM_CLISRV -i eth1 -p tcp -s 192.168.50.10 -d 192.168.50.1 -m state --state NEW -j PM_REJECT
 -A PM_CLISRV -i eth1 -p udp -s 192.168.50.10 -d 192.168.50.1 -m state --state NEW -j PM_REJECT
 -A PM_CLISRV -i eth1 -p icmp -s 192.168.50.10 -d 192.168.50.1 -m state --state NEW -j PM_REJECT
 
-# --- Cadena PM_WEBBLOCK: bloqueo por IP de dominios ---
-# Facebook (5 IPs resueltas)
--A PM_WEBBLOCK -p tcp -d 157.240.197.17 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 157.240.197.17 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 157.240.197.17 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 157.240.197.35 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 157.240.197.35 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 157.240.197.35 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 157.240.226.1 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 157.240.226.1 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 157.240.226.1 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 57.144.196.1 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 57.144.196.1 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 57.144.196.1 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 57.144.22.1 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 57.144.22.1 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 57.144.22.1 --dport 443 -j PM_REJECT
-# YouTube (41 IPs resueltas)
--A PM_WEBBLOCK -p tcp -d 108.177.123.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 108.177.123.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 108.177.123.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 108.177.123.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.93 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 108.177.123.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 108.177.123.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.103 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.103 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.103 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.104 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.104 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.104 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.105 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.105 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.105 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.106 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.106 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.106 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.147 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.147 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.147 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.93 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.99 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.0.99 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.0.99 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.219.174 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.250.219.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.250.219.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.0.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.0.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.0.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.0.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.129.206 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.129.206 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.129.206 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.132.14 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.132.14 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.132.14 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.132.174 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.132.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.132.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.133.100 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.133.100 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.133.100 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.133.110 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 142.251.133.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 142.251.133.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.162.110 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.162.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.162.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.162.142 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.162.142 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.162.142 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.192.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.192.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.192.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.93 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.192.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.192.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.28.110 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.28.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.28.110 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.29.14 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.29.14 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.29.14 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.30.174 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.30.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.30.174 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.30.206 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 172.217.30.206 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 172.217.30.206 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.186.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.186.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.186.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.93 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.186.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.186.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.136 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.190.136 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.190 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.190.190 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.91 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.190.91 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.93 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 64.233.190.93 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 64.233.190.93 --dport 443 -j PM_REJECT
-# Hotmail / Outlook (29 IPs resueltas)
--A PM_WEBBLOCK -p tcp -d 20.190.135.17 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.135.17 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.135.17 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.135.3 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.135.3 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.135.3 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.135.5 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.135.5 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.135.5 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.128 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.128 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.128 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.132 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.132 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.132 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.144 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.144 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.144 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.145 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.145 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.145 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.2 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.2 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.2 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.68 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.68 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.68 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.69 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 20.190.173.69 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 20.190.173.69 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 204.79.197.212 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 204.79.197.212 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 204.79.197.212 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.12 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.12 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.28.12 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.13 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.13 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.28.13 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.19 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.28.19 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.28.19 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.45.20 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.45.20 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.45.20 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.7.32 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.7.32 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.7.32 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.7.35 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.126.7.35 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.126.7.35 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.168.194 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.168.194 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.99.168.194 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.169.162 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.169.162 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.99.169.162 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.245.34 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 40.99.245.34 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 40.99.245.34 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.96.122.242 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.96.122.242 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.96.122.242 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.106.98 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.106.98 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.106.98 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.28.130 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.28.130 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.28.130 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.114 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.114 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.114 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.130 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.130 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.130 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.162 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.162 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.162 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.66 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.66 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.66 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.82 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.82 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.82 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.98 --dport 80 -j PM_REJECT
--A PM_WEBBLOCK -p tcp -d 52.97.51.98 --dport 443 -j PM_REJECT
--A PM_WEBBLOCK -p udp -d 52.97.51.98 --dport 443 -j PM_REJECT
+# [Cadena PM_WEBBLOCK: bloqueo por ipset]
+# Los sets PM_FACEBOOK, PM_YOUTUBE, PM_HOTMAIL se cargan con:
+# ipset restore < /opt/proyecto-m/rules/project_m.ipset
 
-# --- Saltos FORWARD → cadenas personalizadas ---
+# Facebook: set PM_FACEBOOK (5 IPs cargadas)
+-A PM_WEBBLOCK -p tcp --dport 80 -m set --match-set PM_FACEBOOK dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 80 -m set --match-set PM_FACEBOOK dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m set --match-set PM_FACEBOOK dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 443 -m set --match-set PM_FACEBOOK dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "facebook.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "fbcdn.net" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "fb.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "messenger.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "fbsbx.com" --algo bm --to 65535 -j PM_REJECT
+# YouTube: set PM_YOUTUBE (141 IPs cargadas)
+-A PM_WEBBLOCK -p tcp --dport 80 -m set --match-set PM_YOUTUBE dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 80 -m set --match-set PM_YOUTUBE dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m set --match-set PM_YOUTUBE dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 443 -m set --match-set PM_YOUTUBE dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtube.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtu.be" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "googlevideo.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "ytimg.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "ggpht.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtube-nocookie.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtubei.googleapis.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtube.googleapis.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtube.l.google.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "youtube-ui.l.google.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "ytstatic.l.google.com" --algo bm --to 65535 -j PM_REJECT
+# Hotmail / Outlook: set PM_HOTMAIL (48 IPs cargadas)
+-A PM_WEBBLOCK -p tcp --dport 80 -m set --match-set PM_HOTMAIL dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 80 -m set --match-set PM_HOTMAIL dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m set --match-set PM_HOTMAIL dst -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 443 -m set --match-set PM_HOTMAIL dst -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "hotmail.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "outlook.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "live.com" --algo bm --to 65535 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp --dport 443 -m string --string "microsoftonline.com" --algo bm --to 65535 -j PM_REJECT
+
+# [Reglas de Bloqueo DNS Agresivo (Filtro de Contenido)]
+-A PM_WEBBLOCK -p tcp -d 1.1.1.1 --dport 443 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp -d 1.0.0.1 --dport 443 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp -d 8.8.8.8 --dport 443 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp -d 8.8.4.4 --dport 443 -j PM_REJECT
+-A PM_WEBBLOCK -p tcp -d 9.9.9.9 --dport 443 -j PM_REJECT
+# Bloqueo global de DoT (puerto 853) para forzar fallback a DNS normal
+-A PM_WEBBLOCK -p tcp --dport 853 -j PM_REJECT
+-A PM_WEBBLOCK -p udp --dport 853 -j PM_REJECT
+# Bloqueo global de QUIC para forzar fallback a TCP
+-A PM_WEBBLOCK -p udp --dport 443 -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fbsbx" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fbsbx" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fbsbx" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fbsbx" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fbsbx" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fbsbx" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fbsbx" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fbsbx" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "outlook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "outlook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "outlook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "outlook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "outlook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "outlook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "outlook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "outlook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtube-nocookie" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtube-nocookie" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtube-nocookie" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtube-nocookie" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtube-nocookie" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtube-nocookie" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtube-nocookie" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtube-nocookie" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "cloudflare-dns" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "cloudflare-dns" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "cloudflare-dns" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "cloudflare-dns" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "cloudflare-dns" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "cloudflare-dns" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "cloudflare-dns" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "cloudflare-dns" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fb.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fb.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fb.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fb.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fb.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fb.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fb.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fb.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtubei" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtubei" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtubei" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtubei" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtubei" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtubei" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtubei" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtubei" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "microsoftonline" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "microsoftonline" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "microsoftonline" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "microsoftonline" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "microsoftonline" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "microsoftonline" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "microsoftonline" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "microsoftonline" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ytimg" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ytimg" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ytimg" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ytimg" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ytimg" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ytimg" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ytimg" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ytimg" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtu" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtu" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtu" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtu" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtu" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtu" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtu" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtu" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "hotmail" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "hotmail" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "hotmail" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "hotmail" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "hotmail" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "hotmail" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "hotmail" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "hotmail" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "dns.google" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "dns.google" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "dns.google" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "dns.google" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "dns.google" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "dns.google" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "dns.google" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "dns.google" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "googlevideo" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "googlevideo" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "googlevideo" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "googlevideo" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "googlevideo" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "googlevideo" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "googlevideo" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "googlevideo" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ggpht" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ggpht" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ggpht" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ggpht" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ggpht" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ggpht" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ggpht" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ggpht" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ytstatic" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ytstatic" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ytstatic" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ytstatic" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "ytstatic" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "ytstatic" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "ytstatic" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "ytstatic" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fbcdn" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fbcdn" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fbcdn" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fbcdn" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "fbcdn" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "fbcdn" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "fbcdn" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "fbcdn" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "dns.quad9" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "dns.quad9" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "dns.quad9" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "dns.quad9" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "dns.quad9" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "dns.quad9" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "dns.quad9" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "dns.quad9" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "use-application-dns.net" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "use-application-dns.net" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "use-application-dns.net" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "use-application-dns.net" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "use-application-dns.net" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "use-application-dns.net" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "use-application-dns.net" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "use-application-dns.net" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "live.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "live.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "live.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "live.com" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "live.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "live.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "live.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "live.com" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "facebook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "facebook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "facebook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "facebook" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "facebook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "facebook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "facebook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "facebook" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtube" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtube" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtube" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtube" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "youtube" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "youtube" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "youtube" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "youtube" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "messenger" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "messenger" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "messenger" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "messenger" --algo bm -j PM_REJECT
+-A PM_DNSBLOCK -p udp --dport 53 -m string --string "messenger" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p udp --sport 53 -m string --string "messenger" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --dport 53 -m string --string "messenger" --algo kmp -j PM_REJECT
+-A PM_DNSBLOCK -p tcp --sport 53 -m string --string "messenger" --algo kmp -j PM_REJECT
+
+# [Saltos INPUT a cadenas personalizadas]
+-A INPUT -p udp --dport 10053 -j ACCEPT
+-A INPUT -p tcp --dport 10053 -j ACCEPT
+-A INPUT -j PM_WEBBLOCK
+-A INPUT -p udp --dport 53 -j PM_DNSBLOCK
+-A INPUT -p tcp --dport 53 -j PM_DNSBLOCK
+
+# [Saltos FORWARD a cadenas personalizadas]
 -A FORWARD -i eth1 -j PM_MACBLOCK
 -A FORWARD -i eth1 -j PM_CONNLIMIT
 -A FORWARD -i eth1 -j PM_CLISRV
 -A FORWARD -i eth1 -j PM_WEBBLOCK
+-A FORWARD -p udp --dport 53 -j PM_DNSBLOCK
+-A FORWARD -p tcp --dport 53 -j PM_DNSBLOCK
+
+# [Saltos OUTPUT a PM_WEBBLOCK para bloqueo local]
+-A OUTPUT -j PM_WEBBLOCK
+-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK
+-A OUTPUT -p tcp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK
 
 COMMIT

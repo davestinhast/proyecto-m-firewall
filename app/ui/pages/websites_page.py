@@ -307,7 +307,7 @@ class _StatusBar(QFrame):
         gw_icon.setFixedWidth(140)
         row2.addWidget(gw_icon)
 
-        srv_ip = self._config.get("server_ip", "") or "192.168.50.1"
+        srv_ip = self._config.get("server_ip", "") or self._detect_server_ip()
         self._gw_cmd = f"sudo ip route add default via {srv_ip}"
         
         instructions_lbl = QLabel(
@@ -356,9 +356,19 @@ class _StatusBar(QFrame):
 
     def update_config(self, config: dict):
         self._config = config
-        srv_ip = config.get("server_ip", "") or "192.168.50.1"
+        srv_ip = config.get("server_ip", "") or self._detect_server_ip()
         self._gw_cmd = f"sudo ip route add default via {srv_ip}"
         self.refresh()
+
+    def _detect_server_ip(self) -> str:
+        try:
+            from app.services import network_service
+            ip, _ = network_service.get_own_ip_and_interface()
+            if ip and ip != "127.0.0.1":
+                return ip
+        except Exception:
+            pass
+        return "192.168.50.1"
 
 
 # ─── PANEL DE DIAGNOSTICO ────────────────────────────────────────────────────

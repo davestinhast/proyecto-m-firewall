@@ -113,6 +113,7 @@ BLOCKED_DOMAINS = {
             "ggpht.com",
             "www.ggpht.com",
             "youtubei.googleapis.com",
+            "youtube.googleapis.com",
             "play.google.com",
         ],
         "enabled": False,

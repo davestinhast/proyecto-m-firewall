@@ -18,6 +18,40 @@ from app.constants import (
 )
 
 
+SNI_KEYWORDS = {
+    "facebook": ["facebook.com", "fbcdn.net", "fb.com", "messenger.com", "fbsbx.com"],
+    "youtube": [
+        "youtube.com",
+        "youtu.be",
+        "googlevideo.com",
+        "ytimg.com",
+        "ggpht.com",
+        "youtube-nocookie.com",
+        "youtubei.googleapis.com",
+        "youtube.googleapis.com",
+        "youtube.l.google.com",
+        "youtube-ui.l.google.com",
+        "ytstatic.l.google.com",
+    ],
+    "hotmail": ["hotmail.com", "outlook.com", "live.com", "microsoftonline.com"],
+}
+
+DNS_KEYWORDS = {
+    "facebook": ["facebook", "fbcdn", "fb.com", "messenger", "fbsbx"],
+    "youtube": [
+        "youtube",
+        "youtu",
+        "googlevideo",
+        "ytimg",
+        "ggpht",
+        "youtube-nocookie",
+        "youtubei",
+        "ytstatic",
+    ],
+    "hotmail": ["hotmail", "outlook", "live.com", "microsoftonline"],
+}
+
+
 def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     """
     config: dict de configuración
@@ -167,6 +201,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     # === Bloqueo sitios web ===
     blocked_domains = config.get("blocked_domains", {})
     has_webblock = any(v.get("enabled", False) for v in blocked_domains.values())
+    keywords = []  # inicializar aquí para evitar NameError si has_webblock es False
     if has_webblock:
         lines.append(f"# [Cadena {CHAIN_WEBBLOCK}: bloqueo por ipset]")
         lines.append("# Los sets PM_FACEBOOK, PM_YOUTUBE, PM_HOTMAIL se cargan con:")
@@ -196,24 +231,17 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             # BLOQUEO SNI (Server Name Indication) PARA HTTPS (TLS 1.2/1.3)
             # Esto bloquea la conexión incluso si el cliente tiene la IP cacheadada o usa DoH, 
             # ya que lee el dominio en texto plano durante el 'Client Hello' del protocolo TLS.
-            sni_keywords = []
-            if key == "facebook":
-                sni_keywords = ["facebook.com", "fbcdn.net"]
-            elif key == "youtube":
-                sni_keywords = ["youtube.com", "googlevideo.com", "ytimg.com"]
-            elif key == "hotmail":
-                sni_keywords = ["hotmail.com", "outlook.com", "live.com"]
+            sni_keywords = SNI_KEYWORDS.get(key, [])
             
             for kw in sni_keywords:
                 lines.append(
                     f"-A {CHAIN_WEBBLOCK} -p tcp --dport 443 "
-                    f"-m string --string \"{kw}\" --algo bm --to 1500 "
+                    f"-m string --string \"{kw}\" --algo bm --to 65535 "
                     f"-j {IPTABLES_CHAIN_REJECT}"
                 )
 
         # El bloqueo DNS inteligente se activa de forma AUTOMÁTICA para cualquier dominio que esté habilitado.
         # Así el usuario no tiene que activar casillas avanzadas complejas.
-        keywords = []
         if has_webblock:
             # Siempre bloquear servidores DNS seguros (DoH) y el dominio canario de Firefox (use-application-dns.net)
             # para forzar fallback a DNS estándar (puerto 53)
@@ -222,13 +250,7 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
             # Agregar palabras clave según el sitio activado
             for key, domain_cfg in blocked_domains.items():
                 if domain_cfg.get("enabled", False):
-                    if key == "facebook":
-                        keywords += ["facebook", "fbcdn"]
-                    elif key == "youtube":
-                        # Usamos "youtu" para abarcar youtube.com y youtu.be de un solo golpe
-                        keywords += ["youtu", "googlevideo", "ytimg"]
-                    elif key == "hotmail":
-                        keywords += ["hotmail", "outlook", "live.com"]
+                    keywords += DNS_KEYWORDS.get(key, [])
 
         if keywords:
             lines.append("")

@@ -8,7 +8,7 @@ from .core.configuration import load_config, save_config
 from .constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
 
 # Versión del esquema de config — incrementar cuando cambien los defaults
-CONFIG_SCHEMA_VERSION = 2
+CONFIG_SCHEMA_VERSION = 3
 
 
 def _apply_defaults(config: dict) -> dict:
@@ -16,17 +16,36 @@ def _apply_defaults(config: dict) -> dict:
     Si el config guardado es de una versión anterior, resetea a defaults.
     """
     saved_version = config.get("_schema_version", 0)
+    changed = False
 
     if saved_version < CONFIG_SCHEMA_VERSION:
         config["blocked_domains"] = copy.deepcopy(BLOCKED_DOMAINS)
         config["conn_profiles"]   = copy.deepcopy(DEFAULT_CONN_PROFILES)
         config["_schema_version"] = CONFIG_SCHEMA_VERSION
-        save_config(config)
+        changed = True
 
     if not config.get("blocked_domains"):
         config["blocked_domains"] = copy.deepcopy(BLOCKED_DOMAINS)
+        changed = True
     if not config.get("conn_profiles"):
         config["conn_profiles"] = copy.deepcopy(DEFAULT_CONN_PROFILES)
+        changed = True
+
+    # Mantiene las casillas del usuario, pero actualiza listas de dominios
+    # cuando el proyecto aprende nuevos endpoints/CDN.
+    for key, defaults in BLOCKED_DOMAINS.items():
+        current = config.setdefault("blocked_domains", {}).setdefault(key, copy.deepcopy(defaults))
+        current.setdefault("label", defaults.get("label", key))
+        current.setdefault("description", defaults.get("description", ""))
+        current.setdefault("enabled", defaults.get("enabled", False))
+        known_domains = current.setdefault("domains", [])
+        for domain in defaults.get("domains", []):
+            if domain not in known_domains:
+                known_domains.append(domain)
+                changed = True
+
+    if changed:
+        save_config(config)
 
     return config
 
