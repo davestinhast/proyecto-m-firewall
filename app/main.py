@@ -8,7 +8,7 @@ from .core.configuration import load_config, save_config
 from .constants import BLOCKED_DOMAINS, DEFAULT_CONN_PROFILES
 
 # Versión del esquema de config — incrementar cuando cambien los defaults
-CONFIG_SCHEMA_VERSION = 3
+CONFIG_SCHEMA_VERSION = 4  # v4: remove googleapis/ggpht from youtube (shared IPs with Google Search)
 
 
 def _apply_defaults(config: dict) -> dict:

@@ -94,6 +94,9 @@ BLOCKED_DOMAINS = {
         "label": "YouTube",
         "description": "YouTube y Google Video CDN",
         "domains": [
+            # Solo dominios con IPs EXCLUSIVAS de YouTube.
+            # ggpht.com, googleapis.com, *.l.google.com → IPs compartidas con Google Search → NO incluir en ipset
+            # El DNS Proxy bloquea esos dominios via keyword "youtube"/"ggpht"/"ytimg" sin tocar IPs de Google
             "youtube.com",
             "www.youtube.com",
             "m.youtube.com",
@@ -102,17 +105,8 @@ BLOCKED_DOMAINS = {
             "www.googlevideo.com",
             "ytimg.com",
             "www.ytimg.com",
-            "yt3.ggpht.com",
             "youtube-nocookie.com",
             "www.youtube-nocookie.com",
-            "youtube.l.google.com",
-            "youtube-ui.l.google.com",
-            "ytimg.l.google.com",
-            "ytstatic.l.google.com",
-            "ggpht.com",
-            "www.ggpht.com",
-            "youtubei.googleapis.com",
-            "youtube.googleapis.com",
         ],
         "enabled": False,
     },

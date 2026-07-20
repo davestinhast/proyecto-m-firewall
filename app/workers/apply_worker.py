@@ -166,6 +166,12 @@ class ApplyWorker(QThread):
                     self.log_line.emit(f"\n[AVISO] /etc/hosts: {hosts_msg}")
                 self.log_line.emit("\n[!] FIREWALL CONFIGURADO Y ACTIVO CORRECTAMENTE.")
                 self.log_line.emit("[!] Todos los bloqueos han sido aplicados con éxito en el kernel.")
+                self.log_line.emit("")
+                self.log_line.emit("╔══════════════════════════════════════════════════╗")
+                self.log_line.emit("║  IMPORTANTE: Reinicia Firefox para que el        ║")
+                self.log_line.emit("║  bloqueo de YouTube sea efectivo inmediatamente. ║")
+                self.log_line.emit("║  Los demás sitios quedan bloqueados de inmediato.║")
+                self.log_line.emit("╚══════════════════════════════════════════════════╝")
             else:
                 self.log_line.emit(f"\n[ERROR] Falló la aplicación en el sistema: {msg}")
 
