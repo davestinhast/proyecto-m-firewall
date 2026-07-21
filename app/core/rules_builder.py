@@ -115,14 +115,21 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     server_ip = config.get("server_ip", "")
     skip_dns_dnat = config.get("_skip_dns_dnat", False)
     if has_webblock and server_ip and not skip_dns_dnat:
-        # Redirigir tráfico DNS (UDP/TCP 53) de clientes al proxy local en el puerto 10053
-        # NOTA: Solo se agrega si el DNS Proxy está corriendo (verificado en apply_worker).
-        # Si el proxy no está activo y se agregan estas reglas, TODO el internet falla.
+        # PREROUTING: redirigir DNS de clientes LAN al proxy local en puerto 10053.
+        # Solo PREROUTING — NO se agrega OUTPUT DNAT.
+        #
+        # Por qué NO OUTPUT DNAT:
+        #   En Kali con iptables-nft (backend nftables), el match "! --uid-owner 0"
+        #   en NAT OUTPUT puede fallar silenciosamente, haciendo que el DNS proxy (root)
+        #   también tenga sus propias queries al upstream DNAT'adas de vuelta a sí mismo.
+        #   Eso genera un bucle infinito: proxy → upstream → DNAT → proxy → upstream → ...
+        #   El socket se inunda de threads y todo el DNS local muere → internet bloqueado.
+        #
+        # Para la máquina Kali local, /etc/hosts ya bloquea los 3 sitios ANTES de
+        # que haya cualquier query DNS (nsswitch.conf: files → dns). Sin DNAT en OUTPUT,
+        # Firefox en Kali usa systemd-resolved normalmente para sitios no bloqueados.
         lines.append(f"-A PREROUTING -p udp --dport 53 -j DNAT --to-destination {server_ip}:10053")
         lines.append(f"-A PREROUTING -p tcp --dport 53 -j DNAT --to-destination {server_ip}:10053")
-        # Redirigir tráfico DNS de la propia máquina de Kali (excepto usuario root/la app)
-        lines.append(f"-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j DNAT --to-destination 127.0.0.1:10053")
-        lines.append(f"-A OUTPUT -p tcp --dport 53 -m owner ! --uid-owner 0 -j DNAT --to-destination 127.0.0.1:10053")
 
     if wan:
         lines.append(f"-A POSTROUTING -o {wan} -j MASQUERADE")
@@ -362,15 +369,13 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     lines += [
         "",
         "# [Saltos OUTPUT a PM_WEBBLOCK para bloqueo local]",
+        # PM_WEBBLOCK en OUTPUT bloquea conexiones salientes de Kali a IPs de sitios bloqueados (ipset).
+        # NO se agrega PM_DNSBLOCK en OUTPUT: sin OUTPUT DNAT activo, el DNS proxy no intercepta
+        # las queries locales de Firefox. El bloqueo DNS local lo maneja /etc/hosts (más confiable).
+        # Agregar PM_DNSBLOCK en OUTPUT con "! --uid-owner 0" puede romperse en Kali+iptables-nft
+        # y generar falsos positivos. Los clientes LAN usan FORWARD → PM_DNSBLOCK (sí se mantiene).
         f"-A OUTPUT -j {CHAIN_WEBBLOCK}",
     ]
-
-    if keywords:
-        # En OUTPUT excluimos al usuario root (UID 0) para que la propia app pueda resolver
-        lines += [
-            f"-A OUTPUT -p udp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK",
-            f"-A OUTPUT -p tcp --dport 53 -m owner ! --uid-owner 0 -j PM_DNSBLOCK",
-        ]
 
     lines += [
         "",

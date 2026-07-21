@@ -194,17 +194,32 @@ class DNSProxyServer:
         """
         Reenvía la query DNS al upstream. Si falla, prueba servidores de respaldo en cascada.
         Retorna la respuesta en bytes, o None si todos los servidores fallaron.
+
+        Detección de bucle: si la respuesta viene de 127.0.0.1:10053 (nosotros mismos),
+        significa que el DNAT de iptables está reenviando la query de vuelta al proxy.
+        En ese caso se aborta inmediatamente para evitar bucle infinito de threads.
         """
         servers_to_try = [self.upstream] + [
             s for s in _FALLBACK_DNS_SERVERS if s != self.upstream
         ]
         for server in servers_to_try:
+            # Saltar si el servidor es nosotros mismos (evita bucle)
+            if server in ("127.0.0.1", "127.0.0.53", "0.0.0.0", "::1"):
+                logger.warning(f"DNS Proxy: upstream {server} es loopback — omitiendo para evitar bucle")
+                continue
             up_sock = None
             try:
                 up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 up_sock.settimeout(2.0)
                 up_sock.sendto(data, (server, 53))
-                resp, _ = up_sock.recvfrom(4096)
+                resp, resp_addr = up_sock.recvfrom(4096)
+                # Detección de bucle: si la respuesta viene de nuestro propio puerto, abortar
+                if resp_addr[0] in ("127.0.0.1", "::1") and resp_addr[1] == self.port:
+                    logger.error(
+                        f"DNS Proxy: ¡BUCLE DETECTADO! La respuesta vino de {resp_addr}. "
+                        f"Verifica que OUTPUT DNAT no esté redirigiendo queries del proxy a sí mismo."
+                    )
+                    return None
                 return resp
             except Exception:
                 continue
