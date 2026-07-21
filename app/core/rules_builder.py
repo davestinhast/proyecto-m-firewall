@@ -116,20 +116,26 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     skip_dns_dnat = config.get("_skip_dns_dnat", False)
     if has_webblock and server_ip and not skip_dns_dnat:
         # PREROUTING: redirigir DNS de clientes LAN al proxy local en puerto 10053.
-        # Solo PREROUTING — NO se agrega OUTPUT DNAT.
-        #
-        # Por qué NO OUTPUT DNAT:
-        #   En Kali con iptables-nft (backend nftables), el match "! --uid-owner 0"
-        #   en NAT OUTPUT puede fallar silenciosamente, haciendo que el DNS proxy (root)
-        #   también tenga sus propias queries al upstream DNAT'adas de vuelta a sí mismo.
-        #   Eso genera un bucle infinito: proxy → upstream → DNAT → proxy → upstream → ...
-        #   El socket se inunda de threads y todo el DNS local muere → internet bloqueado.
-        #
-        # Para la máquina Kali local, /etc/hosts ya bloquea los 3 sitios ANTES de
-        # que haya cualquier query DNS (nsswitch.conf: files → dns). Sin DNAT en OUTPUT,
-        # Firefox en Kali usa systemd-resolved normalmente para sitios no bloqueados.
         lines.append(f"-A PREROUTING -p udp --dport 53 -j DNAT --to-destination {server_ip}:10053")
         lines.append(f"-A PREROUTING -p tcp --dport 53 -j DNAT --to-destination {server_ip}:10053")
+        # OUTPUT: redirigir DNS local (Firefox, etc.) al proxy para bloqueo DNS.
+        #
+        # SE USA --mark en lugar de "! --uid-owner 0":
+        #   "! --uid-owner 0" falla silenciosamente en Kali con iptables-nft
+        #   (backend nftables), causando que el proxy se mande queries a sí mismo
+        #   → bucle infinito → todo el DNS muere.
+        #
+        #   El DNS proxy marca sus sockets upstream con SO_MARK=100 (ver dns_proxy_service.py).
+        #   Esta regla excluye esos paquetes marcados del DNAT, rompiendo el bucle.
+        #   xt_mark es un módulo core de Linux — siempre disponible en Kali.
+        lines.append(
+            "-A OUTPUT -p udp --dport 53 -m mark ! --mark 100 "
+            "-j DNAT --to-destination 127.0.0.1:10053"
+        )
+        lines.append(
+            "-A OUTPUT -p tcp --dport 53 -m mark ! --mark 100 "
+            "-j DNAT --to-destination 127.0.0.1:10053"
+        )
 
     if wan:
         lines.append(f"-A POSTROUTING -o {wan} -j MASQUERADE")

@@ -190,34 +190,46 @@ class DNSProxyServer:
         except Exception:
             return len(data)
 
+    # Marca de socket (fwmark) para que iptables excluya las queries upstream del DNAT.
+    # El proxy marca sus sockets con SO_MARK=100 y la regla iptables usa
+    # "-m mark ! --mark 100" para excluirlos, evitando el bucle infinito.
+    # SO_MARK = 36 en Linux (socket.h SOL_SOCKET), siempre disponible en Kali.
+    _UPSTREAM_FWMARK = 100
+    _SO_MARK = 36  # socket.SO_MARK no siempre está definido en Python, usar valor numérico
+
     def _forward_query(self, data: bytes) -> bytes | None:
         """
-        Reenvía la query DNS al upstream. Si falla, prueba servidores de respaldo en cascada.
-        Retorna la respuesta en bytes, o None si todos los servidores fallaron.
+        Reenvía la query DNS al upstream con fallback en cascada.
 
-        Detección de bucle: si la respuesta viene de 127.0.0.1:10053 (nosotros mismos),
-        significa que el DNAT de iptables está reenviando la query de vuelta al proxy.
-        En ese caso se aborta inmediatamente para evitar bucle infinito de threads.
+        Los sockets upstream se marcan con SO_MARK=100 (fwmark).
+        La regla iptables OUTPUT DNAT usa "-m mark ! --mark 100" para excluirlos,
+        así el proxy puede consultar DNS directamente sin ser DNAT'ado a sí mismo.
+        Esto reemplaza el frágil "! --uid-owner 0" que falla en Kali con iptables-nft.
         """
         servers_to_try = [self.upstream] + [
             s for s in _FALLBACK_DNS_SERVERS if s != self.upstream
         ]
         for server in servers_to_try:
-            # Saltar si el servidor es nosotros mismos (evita bucle)
+            # Saltar loopbacks (evita cualquier bucle residual)
             if server in ("127.0.0.1", "127.0.0.53", "0.0.0.0", "::1"):
-                logger.warning(f"DNS Proxy: upstream {server} es loopback — omitiendo para evitar bucle")
+                logger.warning(f"DNS Proxy: upstream {server} es loopback — omitiendo")
                 continue
             up_sock = None
             try:
                 up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 up_sock.settimeout(2.0)
+                # Marcar el socket para que iptables lo excluya del OUTPUT DNAT
+                try:
+                    up_sock.setsockopt(socket.SOL_SOCKET, self._SO_MARK, self._UPSTREAM_FWMARK)
+                except OSError:
+                    pass  # No disponible en Windows o VMs sin CONFIG_FWMARKS
                 up_sock.sendto(data, (server, 53))
                 resp, resp_addr = up_sock.recvfrom(4096)
-                # Detección de bucle: si la respuesta viene de nuestro propio puerto, abortar
+                # Detección de bucle residual: si la respuesta viene del propio proxy, abortar
                 if resp_addr[0] in ("127.0.0.1", "::1") and resp_addr[1] == self.port:
                     logger.error(
-                        f"DNS Proxy: ¡BUCLE DETECTADO! La respuesta vino de {resp_addr}. "
-                        f"Verifica que OUTPUT DNAT no esté redirigiendo queries del proxy a sí mismo."
+                        f"DNS Proxy: ¡BUCLE DETECTADO desde {resp_addr}! "
+                        "SO_MARK no funcionó — verifica que el kernel tenga CONFIG_FWMARKS."
                     )
                     return None
                 return resp
