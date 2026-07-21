@@ -7,6 +7,8 @@ from app.services import firewall_service, domain_service
 from app.core import rules_builder, configuration
 from app.constants import LINUX_RULES_FILE
 import time
+import subprocess
+import os
 
 
 class ApplyWorker(QThread):
@@ -167,10 +169,12 @@ class ApplyWorker(QThread):
                 self.log_line.emit("\n[!] FIREWALL CONFIGURADO Y ACTIVO CORRECTAMENTE.")
                 self.log_line.emit("[!] Todos los bloqueos han sido aplicados con éxito en el kernel.")
                 self.log_line.emit("")
+                # Reiniciar Firefox automáticamente para vaciar caché DNS del navegador
+                self._restart_firefox()
+                self.log_line.emit("")
                 self.log_line.emit("╔══════════════════════════════════════════════════╗")
-                self.log_line.emit("║  IMPORTANTE: Reinicia Firefox para que el        ║")
-                self.log_line.emit("║  bloqueo de YouTube sea efectivo inmediatamente. ║")
-                self.log_line.emit("║  Los demás sitios quedan bloqueados de inmediato.║")
+                self.log_line.emit("║  FIREWALL ACTIVO. Firefox reiniciado.            ║")
+                self.log_line.emit("║  Los bloqueos están efectivos inmediatamente.    ║")
                 self.log_line.emit("╚══════════════════════════════════════════════════╝")
             else:
                 self.log_line.emit(f"\n[ERROR] Falló la aplicación en el sistema: {msg}")
@@ -181,6 +185,56 @@ class ApplyWorker(QThread):
         except Exception as e:
             self.log_line.emit(f"\n[ERROR INESPERADO] {e}")
             self.finished.emit(False, f"Error inesperado: {e}")
+
+
+    def _restart_firefox(self):
+        """
+        Cierra Firefox (mata el proceso) y lo reabre en about:blank
+        para vaciar el caché DNS interno del navegador.
+        Sin esto, Firefox puede seguir accediendo a YouTube con IPs cacheadas.
+        """
+        self.log_line.emit("[SISTEMA] Cerrando Firefox para vaciar caché DNS del navegador...")
+
+        # Matar cualquier instancia de Firefox activa
+        try:
+            subprocess.run(["pkill", "-f", "firefox"], capture_output=True, timeout=5)
+        except Exception:
+            pass
+
+        time.sleep(2)  # Esperar cierre limpio del proceso
+        self.log_line.emit("[SISTEMA] Firefox cerrado. Reabriendo sin pestañas...")
+
+        # Construir entorno con variables de display necesarias para Qt/X11
+        env = os.environ.copy()
+        env.setdefault("DISPLAY", ":0")
+
+        # Si la app corre como root (via sudo), relanzar Firefox como el usuario original
+        sudo_user = env.get("SUDO_USER", "")
+        try:
+            if sudo_user:
+                # Modo sudo: lanzar como usuario real para evitar warning de root en Firefox
+                xauth = env.get("XAUTHORITY", f"/home/{sudo_user}/.Xauthority")
+                subprocess.Popen(
+                    ["sudo", "-u", sudo_user,
+                     f"DISPLAY={env['DISPLAY']}",
+                     f"XAUTHORITY={xauth}",
+                     "firefox", "about:blank"],
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                # Modo root directo (ej: Kali logueado como root en escritorio)
+                subprocess.Popen(
+                    ["firefox", "about:blank"],
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            self.log_line.emit("[SISTEMA] Firefox reabierto en página en blanco. Bloqueos activos.")
+        except Exception as e:
+            self.log_line.emit(f"[AVISO] No se pudo reabrir Firefox automáticamente ({e}).")
+            self.log_line.emit("[AVISO] Abre Firefox manualmente — los bloqueos ya están activos.")
 
 
 class ValidateWorker(QThread):
