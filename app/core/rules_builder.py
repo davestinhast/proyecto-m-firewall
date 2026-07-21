@@ -113,8 +113,11 @@ def build_rules(config: dict, resolved_ips: dict[str, list[str]]) -> str:
     ]
     
     server_ip = config.get("server_ip", "")
-    if has_webblock and server_ip:
+    skip_dns_dnat = config.get("_skip_dns_dnat", False)
+    if has_webblock and server_ip and not skip_dns_dnat:
         # Redirigir tráfico DNS (UDP/TCP 53) de clientes al proxy local en el puerto 10053
+        # NOTA: Solo se agrega si el DNS Proxy está corriendo (verificado en apply_worker).
+        # Si el proxy no está activo y se agregan estas reglas, TODO el internet falla.
         lines.append(f"-A PREROUTING -p udp --dport 53 -j DNAT --to-destination {server_ip}:10053")
         lines.append(f"-A PREROUTING -p tcp --dport 53 -j DNAT --to-destination {server_ip}:10053")
         # Redirigir tráfico DNS de la propia máquina de Kali (excepto usuario root/la app)

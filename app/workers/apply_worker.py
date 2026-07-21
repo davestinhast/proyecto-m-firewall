@@ -138,12 +138,37 @@ class ApplyWorker(QThread):
 
             time.sleep(1)
 
+            # Paso 4.5: Verificar que el DNS Proxy está activo antes de aplicar DNAT
+            self.progress.emit(85, "Verificando DNS Proxy...")
+            try:
+                from app.services.dns_proxy_service import get_dns_proxy, detect_upstream_dns
+                proxy = get_dns_proxy()
+                if not proxy.running:
+                    self.log_line.emit("\n[AVISO] DNS Proxy no estaba activo. Reiniciando...")
+                    proxy.start(self._config)
+                    time.sleep(0.5)
+                if proxy.running:
+                    upstream = detect_upstream_dns()
+                    self.log_line.emit(f"[SISTEMA] DNS Proxy activo en puerto 10053 (upstream: {upstream})")
+                else:
+                    self.log_line.emit(
+                        "[AVISO] DNS Proxy no pudo iniciarse (puerto 10053 en uso o sin permisos)."
+                    )
+                    self.log_line.emit(
+                        "[AVISO] Las reglas DNAT de DNS se omitirán para evitar romper internet."
+                    )
+                    # Desactivar server_ip temporalmente para que build_rules no agregue DNAT
+                    self._config = dict(self._config)
+                    self._config["_skip_dns_dnat"] = True
+            except Exception as e:
+                self.log_line.emit(f"[AVISO] No se pudo verificar DNS Proxy: {e}")
+
             # Paso 5: Generar y compilar la configuración final
             self.progress.emit(90, "Compilando reglas de iptables...")
             self.log_line.emit("\n==========================================")
             self.log_line.emit("4. APLICANDO REGLAS FINALES EN EL SISTEMA")
             self.log_line.emit("==========================================")
-            
+
             rules_content = rules_builder.build_rules(self._config, resolved)
             count = rules_builder.get_rule_count(rules_content)
             self.rule_count.emit(count)

@@ -32,6 +32,9 @@ def _setup_file_logging():
 _server_instance = None
 _server_lock = threading.Lock()
 
+# Servidores DNS de respaldo en orden de prioridad (se usan si el upstream principal falla)
+_FALLBACK_DNS_SERVERS = ["8.8.8.8", "1.1.1.1", "9.9.9.9"]
+
 DNS_BLOCK_KEYWORDS = {
     "facebook": ["facebook", "fbcdn", "fb.com", "messenger", "fbsbx"],
     "youtube": [
@@ -48,22 +51,40 @@ DNS_BLOCK_KEYWORDS = {
 }
 
 def detect_upstream_dns() -> str:
-    """Detecta dinámicamente el servidor DNS configurado en el sistema (evita loopbacks)."""
-    try:
-        resolv = Path("/etc/resolv.conf")
-        if resolv.exists():
-            for line in resolv.read_text(encoding="utf-8", errors="ignore").splitlines():
+    """
+    Detecta el servidor DNS upstream REAL del sistema.
+
+    Estrategia para Kali Linux con systemd-resolved:
+      - /etc/resolv.conf es un symlink a stub-resolv.conf → solo tiene 127.0.0.53 (loopback)
+      - /run/systemd/resolve/resolv.conf tiene el DNS REAL del DHCP (ej: 192.168.1.1, 10.0.2.3)
+
+    Por eso leemos /run/systemd/resolve/resolv.conf PRIMERO.
+    Si usamos 8.8.8.8 como fallback y la red del laboratorio lo bloquea,
+    TODAS las queries no-bloqueadas fallan silenciosamente → todo parece bloqueado.
+    """
+    loopbacks = {"127.0.0.1", "127.0.0.53", "127.0.1.1", "::1"}
+
+    # Orden: DNS real de systemd-resolved → /etc/resolv.conf → fallback
+    for resolv_path in [
+        Path("/run/systemd/resolve/resolv.conf"),  # DNS real upstream (desde DHCP/config)
+        Path("/etc/resolv.conf"),                   # Puede ser stub o DNS directo
+    ]:
+        try:
+            if not resolv_path.exists():
+                continue
+            for line in resolv_path.read_text(encoding="utf-8", errors="ignore").splitlines():
                 line = line.strip()
                 if line.startswith("nameserver "):
                     ns = line.split()[1].strip()
-                    # Ignorar direcciones loopback locales para no causar bucles infinitos
-                    if ns not in ["127.0.0.1", "127.0.0.53", "127.0.1.1", "::1"]:
-                        logger.info(f"DNS Proxy: Detectado DNS del sistema activo: {ns}")
+                    if ns not in loopbacks:
+                        logger.info(f"DNS Proxy: usando upstream DNS: {ns} (desde {resolv_path})")
                         return ns
-    except Exception as e:
-        logger.error(f"Error al leer /etc/resolv.conf: {e}")
-    # Fallback predeterminado a Google DNS si no hay DNS local
+        except Exception as e:
+            logger.error(f"DNS Proxy: error leyendo {resolv_path}: {e}")
+
+    logger.warning("DNS Proxy: no se detectó DNS del sistema, usando 8.8.8.8 como último recurso")
     return "8.8.8.8"
+
 
 class DNSProxyServer:
     def __init__(self, ip="0.0.0.0", port=DNS_PROXY_PORT):
@@ -82,20 +103,28 @@ class DNSProxyServer:
             if self.running:
                 return
 
-            # Detectar el DNS activo de la red del usuario
+            # Detectar el DNS real de la red (no el stub de systemd-resolved)
             self.upstream = detect_upstream_dns()
-            
+
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                # Permitir reusar la dirección/puerto
                 self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                # SO_REUSEPORT permite hacer bind aunque haya otro socket en el mismo puerto
+                # (útil si el proceso anterior no cerró limpiamente)
+                try:
+                    self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                except OSError:
+                    pass  # No disponible en todos los kernels/SO
                 self.sock.bind((self.ip, self.port))
                 self.running = True
                 self.thread = threading.Thread(target=self._listen, daemon=True)
                 self.thread.start()
-                logger.info(f"Servidor DNS Proxy iniciado en {self.ip}:{self.port} (Upstream redirigido a: {self.upstream})")
+                logger.info(
+                    f"Servidor DNS Proxy iniciado en {self.ip}:{self.port} "
+                    f"(upstream: {self.upstream})"
+                )
             except Exception as e:
-                logger.error(f"Error al iniciar DNS Proxy: {e}")
+                logger.error(f"Error al iniciar DNS Proxy en puerto {self.port}: {e}")
 
     def update_config(self, config: dict):
         self.config = config
@@ -114,9 +143,10 @@ class DNSProxyServer:
             logger.info("Servidor DNS Proxy detenido.")
 
     def _listen(self):
+        # Buffer de 4096 bytes — suficiente para respuestas DNS grandes (DNSSEC, etc.)
         while self.running:
             try:
-                data, addr = self.sock.recvfrom(2048)
+                data, addr = self.sock.recvfrom(4096)
                 if not data:
                     continue
                 # Ejecutar el manejo de cada query en un hilo ligero para no bloquear
@@ -160,6 +190,53 @@ class DNSProxyServer:
         except Exception:
             return len(data)
 
+    def _forward_query(self, data: bytes) -> bytes | None:
+        """
+        Reenvía la query DNS al upstream. Si falla, prueba servidores de respaldo en cascada.
+        Retorna la respuesta en bytes, o None si todos los servidores fallaron.
+        """
+        servers_to_try = [self.upstream] + [
+            s for s in _FALLBACK_DNS_SERVERS if s != self.upstream
+        ]
+        for server in servers_to_try:
+            up_sock = None
+            try:
+                up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                up_sock.settimeout(2.0)
+                up_sock.sendto(data, (server, 53))
+                resp, _ = up_sock.recvfrom(4096)
+                return resp
+            except Exception:
+                continue
+            finally:
+                if up_sock:
+                    try:
+                        up_sock.close()
+                    except Exception:
+                        pass
+        return None
+
+    def _make_servfail(self, data: bytes) -> bytes:
+        """
+        Genera respuesta SERVFAIL (RCODE=2) para cuando todos los upstream DNS fallan.
+        SERVFAIL da un error inmediato al cliente en lugar de dejarlo esperando timeout.
+        Flags: 0x8182 = Response(1) OPCODE(0000) AA(0) TC(0) RD(1) RA(1) RCODE(2=SERVFAIL)
+        """
+        if len(data) < 12:
+            return data
+        tx_id = data[:2]
+        qd_count = data[4:6]
+        question_end = self._get_question_end_offset(data)
+        return (
+            tx_id
+            + b"\x81\x82"                          # Flags SERVFAIL
+            + qd_count                              # QDCOUNT (misma pregunta)
+            + b"\x00\x00"                          # ANCOUNT = 0
+            + b"\x00\x00"                          # NSCOUNT = 0
+            + b"\x00\x00"                          # ARCOUNT = 0
+            + data[12:question_end]                 # Sección Question original
+        )
+
     def _write_to_rejected_log(self, client_ip: str, domain: str, action: str):
         """Escribe una línea de log personalizada en el archivo oficial de logs."""
         from datetime import datetime
@@ -198,43 +275,48 @@ class DNSProxyServer:
 
         # Realizar coincidencia case-insensitive sobre el nombre decodificado
         domain_lower = domain.lower()
-        should_block = False
-        for kw in keywords:
-            if kw in domain_lower:
-                should_block = True
-                break
+        should_block = any(kw in domain_lower for kw in keywords)
 
         if should_block:
-            # Responder con un paquete DNS tipo NXDOMAIN (Código de error de nombre: RCODE = 3)
-            # Transaction ID: bytes 0-1
-            # Flags para Respuesta NXDOMAIN: 0x8183 (Response, standard query, recursion desired, recursion available, NXDOMAIN)
-            # Questions Count: bytes 4-5
-            # Answer Count: 0 (0x0000)
-            # Authority Count: 0 (0x0000)
-            # Additional Count: 0 (0x0000)
+            # Responder con NXDOMAIN (RCODE=3)
+            # Flags 0x8183: Response, standard query, RD=1, RA=1, NXDOMAIN
             tx_id = data[:2]
             qd_count = data[4:6]
             question_end = self._get_question_end_offset(data)
-            # Cabecera DNS NXDOMAIN + la pregunta original (truncada para NO incluir EDNS0 original)
-            # Esto evita generar un paquete DNS malformado que Chrome ignoraria.
-            response = tx_id + b"\x81\x83" + qd_count + b"\x00\x00\x00\x00\x00\x00" + data[12:question_end]
+            response = (
+                tx_id
+                + b"\x81\x83"                      # Flags NXDOMAIN
+                + qd_count
+                + b"\x00\x00\x00\x00\x00\x00"
+                + data[12:question_end]
+            )
             try:
                 self.sock.sendto(response, addr)
-                logger.info(f"DNS Proxy: Interceptado y bloqueado {domain} para {client_ip}")
+                logger.info(f"DNS Proxy: BLOQUEADO {domain} para {client_ip}")
                 self._write_to_rejected_log(client_ip, domain, "BLOQUEADO (NXDOMAIN)")
             except Exception:
                 pass
         else:
-            # Reenviar al DNS upstream (ya detectado al iniciar, no releer por paquete)
-            try:
-                up_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                up_sock.settimeout(2.0)
-                up_sock.sendto(data, (self.upstream, 53))
-                resp, _ = up_sock.recvfrom(2048)
-                self.sock.sendto(resp, addr)
-                up_sock.close()
-            except Exception:
-                pass
+            # Reenviar al DNS upstream con cascada de fallback
+            resp = self._forward_query(data)
+            if resp is not None:
+                try:
+                    self.sock.sendto(resp, addr)
+                except Exception:
+                    pass
+            else:
+                # Todos los servidores DNS fallaron — SERVFAIL inmediato en lugar de silencio
+                # Silencio causaría timeout de 30s en el browser para CADA dominio
+                try:
+                    servfail = self._make_servfail(data)
+                    self.sock.sendto(servfail, addr)
+                    logger.warning(
+                        f"DNS Proxy: SERVFAIL para '{domain}' "
+                        f"(upstream {self.upstream} y fallbacks no respondieron)"
+                    )
+                except Exception:
+                    pass
+
 
 def get_dns_proxy() -> DNSProxyServer:
     global _server_instance
